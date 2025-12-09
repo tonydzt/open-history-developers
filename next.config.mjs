@@ -5,6 +5,7 @@ const withMDX = createMDX();
 /** @type {import('next').NextConfig} */
 const config = {
   reactStrictMode: true,
+  // tong注释：这里配置了重定向，当访问根路径时，会重定向到默认的语言路径（例如：'/en'），防止直接访问根目录404
   async redirects() {
     return [
       {
