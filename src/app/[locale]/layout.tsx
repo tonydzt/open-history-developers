@@ -3,6 +3,7 @@ import './global.css';
 import { Inter } from 'next/font/google';
 import { defineI18nUI } from 'fumadocs-ui/i18n';
 import { i18n } from '@/lib/i18n';
+import type { ReactNode } from 'react';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -25,7 +26,7 @@ export default async function Layout({
   children,
 }: {
   params: Promise<{ locale: string }>;
-  children: '[locale]/';
+  children: ReactNode;
 }) {
   const locale = (await params).locale;
 
