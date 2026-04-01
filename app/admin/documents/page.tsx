@@ -64,13 +64,13 @@ async function toFlatDocuments(docs: DocumentWithRelations[]): Promise<Flattened
         parentCache.set(currentId, parent?.parentId || null)
       }
 
-      const parentId = parentCache.get(currentId) || null
-      if (!parentId) {
+      const nextParentId: string | null = parentCache.get(currentId) ?? null
+      if (!nextParentId) {
         break
       }
 
       level += 1
-      currentId = parentId
+      currentId = nextParentId
     }
 
     levelCache.set(docId, level)
