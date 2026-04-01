@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Save, FileText } from 'lucide-react'
@@ -25,7 +26,7 @@ interface DocumentOption {
   categoryId: string
 }
 
-export default function NewDocumentPage() {
+function NewDocumentPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const requestedParentId = searchParams.get('parentId')
@@ -285,5 +286,13 @@ export default function NewDocumentPage() {
         </div>
       </main>
     </div>
+  )
+}
+
+export default function NewDocumentPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-white" />}>
+      <NewDocumentPageContent />
+    </Suspense>
   )
 }
