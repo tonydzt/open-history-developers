@@ -6,19 +6,21 @@
 
 import crypto from 'crypto'
 
+type JsonBody = Record<string, unknown> | undefined
+
 // ============ 配置信息 ============
 const API_BASE_URL = 'http://localhost:3000/api/open'
-const APP_ID = 'your-app-id' // 替换为你的appId
+const USER_ID = 'your-user-id' // 从后台「用户管理」页面复制用户ID
 const PRIVATE_KEY = `-----BEGIN PRIVATE KEY-----
 your-private-key-here
------END PRIVATE KEY-----` // 替换为你的私钥
+-----END PRIVATE KEY-----` // 从后台「用户管理」页面复制 OpenAPI 私钥
 
 // ============ 签名工具函数 ============
 
 /**
  * 生成请求体的hash值
  */
-function generateBodyHash(body: any): string {
+function generateBodyHash(body: JsonBody): string {
   if (!body || Object.keys(body).length === 0) {
     return ''
   }
@@ -29,8 +31,8 @@ function generateBodyHash(body: any): string {
 /**
  * 生成签名内容
  */
-function generateSignContent(appId: string, timestamp: string, bodyHash: string): string {
-  return `${appId}${timestamp}${bodyHash}`
+function generateSignContent(userId: string, timestamp: string, bodyHash: string): string {
+  return `${userId}${timestamp}${bodyHash}`
 }
 
 /**
@@ -46,10 +48,10 @@ function signWithPrivateKey(privateKey: string, content: string): string {
 /**
  * 生成请求签名
  */
-function generateSignature(appId: string, privateKey: string, body?: any): { timestamp: string; sign: string } {
+function generateSignature(userId: string, privateKey: string, body?: JsonBody): { timestamp: string; sign: string } {
   const timestamp = Date.now().toString()
   const bodyHash = generateBodyHash(body)
-  const signContent = generateSignContent(appId, timestamp, bodyHash)
+  const signContent = generateSignContent(userId, timestamp, bodyHash)
   const sign = signWithPrivateKey(privateKey, signContent)
   
   return { timestamp, sign }
@@ -58,12 +60,12 @@ function generateSignature(appId: string, privateKey: string, body?: any): { tim
 /**
  * 构建请求头
  */
-function buildHeaders(appId: string, privateKey: string, body?: any): Record<string, string> {
-  const { timestamp, sign } = generateSignature(appId, privateKey, body)
+function buildHeaders(userId: string, privateKey: string, body?: JsonBody): Record<string, string> {
+  const { timestamp, sign } = generateSignature(userId, privateKey, body)
   
   return {
     'Content-Type': 'application/json',
-    'x-app-id': appId,
+    'x-user-id': userId,
     'x-timestamp': timestamp,
     'x-sign': sign,
   }
@@ -85,7 +87,7 @@ async function getDocuments(page = 1, pageSize = 10, published?: boolean) {
     params.append('published', published.toString())
   }
 
-  const headers = buildHeaders(APP_ID, PRIVATE_KEY)
+  const headers = buildHeaders(USER_ID, PRIVATE_KEY)
   
   const response = await fetch(`${API_BASE_URL}/documents?${params}`, {
     method: 'GET',
@@ -102,7 +104,7 @@ async function getDocuments(page = 1, pageSize = 10, published?: boolean) {
  * GET /api/open/documents/:id
  */
 async function getDocument(id: string) {
-  const headers = buildHeaders(APP_ID, PRIVATE_KEY)
+  const headers = buildHeaders(USER_ID, PRIVATE_KEY)
   
   const response = await fetch(`${API_BASE_URL}/documents/${id}`, {
     method: 'GET',
@@ -123,12 +125,13 @@ async function createDocument(documentData: {
   slug?: string
   content?: string
   excerpt?: string
+  order?: number
   published?: boolean
   parentId?: string
-  categoryId?: string
+  categoryId: string
   authorId: string // 必需
 }) {
-  const headers = buildHeaders(APP_ID, PRIVATE_KEY, documentData)
+  const headers = buildHeaders(USER_ID, PRIVATE_KEY, documentData)
   
   const response = await fetch(`${API_BASE_URL}/documents`, {
     method: 'POST',
@@ -150,11 +153,12 @@ async function updateDocument(id: string, updates: {
   slug?: string
   content?: string
   excerpt?: string
+  order?: number
   published?: boolean
   parentId?: string
-  categoryId?: string
+  categoryId: string
 }) {
-  const headers = buildHeaders(APP_ID, PRIVATE_KEY, updates)
+  const headers = buildHeaders(USER_ID, PRIVATE_KEY, updates)
   
   const response = await fetch(`${API_BASE_URL}/documents/${id}`, {
     method: 'PUT',
@@ -172,7 +176,7 @@ async function updateDocument(id: string, updates: {
  * DELETE /api/open/documents/:id
  */
 async function deleteDocument(id: string) {
-  const headers = buildHeaders(APP_ID, PRIVATE_KEY)
+  const headers = buildHeaders(USER_ID, PRIVATE_KEY)
   
   const response = await fetch(`${API_BASE_URL}/documents/${id}`, {
     method: 'DELETE',
@@ -186,40 +190,30 @@ async function deleteDocument(id: string) {
 
 // ============ 使用示例 ============
 
-async function main() {
-  try {
-    // 1. 获取文档列表
-    await getDocuments(1, 10, true)
-    
-    // 2. 创建文档
-    const newDoc = await createDocument({
-      title: '测试文档',
-      content: '# 测试内容\n\n这是一个测试文档。',
-      excerpt: '这是测试文档的摘要',
-      published: true,
-      authorId: 'your-user-id', // 替换为实际的用户ID
-    })
-    
-    // 3. 获取文档详情
-    if (newDoc.id) {
-      await getDocument(newDoc.id)
-      
-      // 4. 更新文档
-      await updateDocument(newDoc.id, {
-        title: '更新后的测试文档',
-        content: '# 更新后的内容\n\n文档已更新。',
-      })
-      
-      // 5. 删除文档
-      // await deleteDocument(newDoc.id)
-    }
-  } catch (error) {
-    console.error('API调用错误:', error)
-  }
-}
+/*
+示例调用流程：
 
-// 运行示例
-// main()
+await getDocuments(1, 10, true)
+
+const newDoc = await createDocument({
+  title: '测试文档',
+  content: '# 测试内容\\n\\n这是一个测试文档。',
+  excerpt: '这是测试文档的摘要',
+  published: true,
+  categoryId: 'your-category-id',
+  authorId: USER_ID,
+})
+
+if (newDoc.id) {
+  await getDocument(newDoc.id)
+  await updateDocument(newDoc.id, {
+    title: '更新后的测试文档',
+    content: '# 更新后的内容\\n\\n文档已更新。',
+    categoryId: 'your-category-id',
+  })
+  // await deleteDocument(newDoc.id)
+}
+*/
 
 // ============ 导出函数供外部使用 ============
 export {

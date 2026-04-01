@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { openApiAuth } from '@/lib/open-api-auth'
+import { getTopLevelCategoryId } from '@/lib/document-category'
 
 /**
  * GET /api/open/documents - 获取文档列表
@@ -18,7 +20,7 @@ export async function GET(request: NextRequest) {
     const pageSize = parseInt(searchParams.get('pageSize') || '20', 10)
     const published = searchParams.get('published')
 
-    const where: any = {}
+    const where: Prisma.DocumentWhereInput = {}
     if (published !== null) {
       where.published = published === 'true'
     }
@@ -34,10 +36,10 @@ export async function GET(request: NextRequest) {
             select: { id: true, name: true, email: true },
           },
           children: {
-            select: { id: true, title: true, slug: true },
+            select: { id: true, title: true, slug: true, order: true },
           },
         },
-        orderBy: { updatedAt: 'desc' },
+        orderBy: [{ order: 'asc' }, { title: 'asc' }, { updatedAt: 'desc' }],
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),
@@ -71,7 +73,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json()
-    const { title, slug, content, excerpt, published, parentId, categoryId, authorId } = body
+    const { title, slug, content, excerpt, order, published, parentId, categoryId, authorId } = body
 
     if (!title) {
       return NextResponse.json({ error: 'Title is required' }, { status: 400 })
@@ -87,15 +89,47 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid authorId' }, { status: 400 })
     }
 
+    let resolvedCategoryId = ''
+
+    if (parentId) {
+      const parentDocument = await prisma.document.findUnique({
+        where: { id: parentId },
+        select: { id: true },
+      })
+
+      if (!parentDocument) {
+        return NextResponse.json({ error: 'Invalid parentId' }, { status: 400 })
+      }
+
+      const inheritedCategoryId = await getTopLevelCategoryId(prisma, parentId)
+      if (!inheritedCategoryId) {
+        return NextResponse.json({ error: 'Failed to resolve parent category' }, { status: 400 })
+      }
+
+      resolvedCategoryId = inheritedCategoryId
+    } else {
+      if (!categoryId || typeof categoryId !== 'string' || !categoryId.trim()) {
+        return NextResponse.json({ error: 'categoryId is required for top-level documents' }, { status: 400 })
+      }
+
+      const category = await prisma.category.findUnique({ where: { id: categoryId } })
+      if (!category) {
+        return NextResponse.json({ error: 'Invalid categoryId' }, { status: 400 })
+      }
+
+      resolvedCategoryId = category.id
+    }
+
     const document = await prisma.document.create({
       data: {
         title,
         slug: slug || title.toLowerCase().replace(/[^a-z0-9\u4e00-\u9fa5]+/g, '-').replace(/^-+|-+$/g, ''),
         content: content || '',
         excerpt,
+        order: typeof order === 'number' ? order : 0,
         published: published || false,
         parentId: parentId || null,
-        categoryId: categoryId || null,
+        categoryId: resolvedCategoryId,
         authorId,
       },
       include: {

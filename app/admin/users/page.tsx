@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import Link from 'next/link'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import { useConfirm } from '@/components/ui/ConfirmProvider'
 
 interface User {
   id: string
@@ -10,6 +10,7 @@ interface User {
   name: string | null
   role: string
   createdAt: string
+  openApiPrivateKey: string | null
 }
 
 const roleLabels: Record<string, string> = {
@@ -19,18 +20,25 @@ const roleLabels: Record<string, string> = {
 }
 
 const roleColors: Record<string, string> = {
-  SUPER_ADMIN: 'from-purple-100 to-pink-100 text-purple-700 dark:from-purple-900/50 dark:to-pink-900/50 dark:text-purple-300',
-  ADMIN: 'from-indigo-100 to-blue-100 text-indigo-700 dark:from-indigo-900/50 dark:to-blue-900/50 dark:text-indigo-300',
-  API_USER: 'from-slate-100 to-gray-100 text-slate-700 dark:from-slate-800 dark:to-gray-800 dark:text-slate-300'
+  SUPER_ADMIN: 'bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700',
+  ADMIN: 'bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700',
+  API_USER: 'bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700'
 }
 
 export default function UsersPage() {
   const router = useRouter()
+  const { confirm } = useConfirm()
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
+  const tableActionClass =
+    'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-medium transition-colors'
+  const warningActionClass =
+    'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-amber-200 dark:border-amber-900/60 text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/30 text-xs font-medium transition-colors'
+  const dangerActionClass =
+    'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-rose-200 dark:border-rose-900/60 text-rose-700 dark:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-950/30 text-xs font-medium transition-colors'
   const [formData, setFormData] = useState({
     email: '',
     name: '',
@@ -38,11 +46,7 @@ export default function UsersPage() {
     role: 'API_USER'
   })
 
-  useEffect(() => {
-    fetchUsers()
-  }, [])
-
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     try {
       const res = await fetch('/api/admin/users')
       if (res.status === 401) {
@@ -62,7 +66,11 @@ export default function UsersPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [router])
+
+  useEffect(() => {
+    fetchUsers()
+  }, [fetchUsers])
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -80,7 +88,7 @@ export default function UsersPage() {
         const data = await res.json()
         alert(data.error || '创建失败')
       }
-    } catch (error) {
+    } catch {
       alert('创建失败')
     }
   }
@@ -108,13 +116,21 @@ export default function UsersPage() {
         const data = await res.json()
         alert(data.error || '更新失败')
       }
-    } catch (error) {
+    } catch {
       alert('更新失败')
     }
   }
 
   const handleDelete = async (user: User) => {
-    if (!confirm(`确定要删除用户 ${user.email} 吗？`)) return
+    const confirmed = await confirm({
+      title: '删除用户',
+      description: `确定要删除用户 ${user.email} 吗？该操作不可恢复。`,
+      confirmText: '删除',
+      cancelText: '取消',
+      variant: 'danger',
+    })
+    if (!confirmed) return
+
     try {
       const res = await fetch(`/api/admin/users/${user.id}`, {
         method: 'DELETE'
@@ -125,7 +141,7 @@ export default function UsersPage() {
         const data = await res.json()
         alert(data.error || '删除失败')
       }
-    } catch (error) {
+    } catch {
       alert('删除失败')
     }
   }
@@ -141,6 +157,31 @@ export default function UsersPage() {
     setShowEditModal(true)
   }
 
+  const handleResetKeys = async (user: User) => {
+    const confirmed = await confirm({
+      title: '重置公私钥',
+      description: `确定要重置用户 ${user.email} 的公私钥吗？旧私钥会立即失效。`,
+      confirmText: '重置',
+      cancelText: '取消',
+      variant: 'danger',
+    })
+    if (!confirmed) return
+
+    try {
+      const res = await fetch(`/api/admin/users/${user.id}/reset-keys`, {
+        method: 'POST'
+      })
+      if (res.ok) {
+        fetchUsers()
+      } else {
+        const data = await res.json()
+        alert(data.error || '重置失败')
+      }
+    } catch {
+      alert('重置失败')
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50/30 dark:from-slate-950 dark:via-slate-900 dark:to-indigo-950/30 flex items-center justify-center">
@@ -153,28 +194,15 @@ export default function UsersPage() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50/30 dark:from-slate-950 dark:via-slate-900 dark:to-indigo-950/30">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-slate-900 to-indigo-800 dark:from-white dark:to-indigo-300 bg-clip-text text-transparent">
-              用户管理
-            </h1>
-            <p className="text-slate-600 dark:text-slate-400 mt-1">
-              管理系统用户和权限
-            </p>
-          </div>
-          <div className="flex items-center gap-4">
-            <Link
-              href="/admin/documents"
-              className="text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
-            >
-              文档管理
-            </Link>
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="bg-gradient-to-r from-indigo-500 to-purple-500 text-white px-5 py-2.5 rounded-xl hover:from-indigo-600 hover:to-purple-600 transition-all shadow-lg shadow-indigo-500/25"
-            >
-              + 新建用户
-            </button>
-          </div>
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-slate-900 to-indigo-800 dark:from-white dark:to-indigo-300 bg-clip-text text-transparent">
+            用户管理
+          </h1>
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="bg-gradient-to-r from-indigo-500 to-purple-500 text-white px-5 py-2.5 rounded-xl hover:from-indigo-600 hover:to-purple-600 transition-all shadow-lg shadow-indigo-500/25"
+          >
+            + 新建用户
+          </button>
         </div>
 
         <div className="bg-white/80 dark:bg-slate-900/50 backdrop-blur-sm rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-xl overflow-hidden">
@@ -186,6 +214,9 @@ export default function UsersPage() {
                 </th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                   角色
+                </th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                  OpenAPI 私钥
                 </th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                   创建时间
@@ -209,9 +240,18 @@ export default function UsersPage() {
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`px-3 py-1 text-xs rounded-full font-medium bg-gradient-to-r ${roleColors[user.role]}`}>
+                    <span className={`px-3 py-1 text-xs rounded-full font-medium ${roleColors[user.role]}`}>
                       {roleLabels[user.role]}
                     </span>
+                  </td>
+                  <td className="px-6 py-4 max-w-md">
+                    {user.openApiPrivateKey ? (
+                      <pre className="text-[11px] leading-4 p-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 overflow-auto max-h-28 whitespace-pre-wrap break-all">
+                        {user.openApiPrivateKey}
+                      </pre>
+                    ) : (
+                      <span className="text-sm text-slate-500 dark:text-slate-400">-</span>
+                    )}
                   </td>
                   <td className="px-6 py-4 text-sm text-slate-500 dark:text-slate-400">
                     {new Date(user.createdAt).toLocaleDateString('zh-CN')}
@@ -219,14 +259,20 @@ export default function UsersPage() {
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-3">
                       <button
+                        onClick={() => handleResetKeys(user)}
+                        className={warningActionClass}
+                      >
+                        重置公私钥
+                      </button>
+                      <button
                         onClick={() => openEditModal(user)}
-                        className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 text-sm font-medium transition-colors"
+                        className={tableActionClass}
                       >
                         编辑
                       </button>
                       <button
                         onClick={() => handleDelete(user)}
-                        className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 text-sm font-medium transition-colors"
+                        className={dangerActionClass}
                       >
                         删除
                       </button>

@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, Calendar, User, Eye, ChevronRight, FileText, ChevronDown, PanelLeftClose, PanelRightClose, PanelLeft, PanelRight } from 'lucide-react'
 
 interface Document {
@@ -29,21 +29,36 @@ interface DocumentPageProps {
   documentTree: Document[]
 }
 
-function DocumentTree({ documents, currentSlug, level = 0 }: { documents: Document[], currentSlug: string, level?: number }) {
-  const [expanded, setExpanded] = useState<Set<string>>(new Set())
+const DOC_TREE_EXPANDED_KEY = 'docs-tree-expanded'
 
-  const toggleExpand = (id: string) => {
-    setExpanded(prev => {
-      const next = new Set(prev)
-      if (next.has(id)) {
-        next.delete(id)
-      } else {
-        next.add(id)
-      }
-      return next
-    })
+function findAncestorIdsBySlug(documents: Document[], targetSlug: string): string[] {
+  for (const doc of documents) {
+    if (doc.slug === targetSlug) {
+      return []
+    }
+
+    const childAncestors = findAncestorIdsBySlug(doc.children || [], targetSlug)
+    if (childAncestors.length > 0 || (doc.children || []).some(child => child.slug === targetSlug)) {
+      return [doc.id, ...childAncestors]
+    }
   }
 
+  return []
+}
+
+function DocumentTree({
+  documents,
+  currentSlug,
+  expanded,
+  onToggle,
+  level = 0,
+}: {
+  documents: Document[]
+  currentSlug: string
+  expanded: Set<string>
+  onToggle: (id: string) => void
+  level?: number
+}) {
   if (documents.length === 0) return null
 
   return (
@@ -65,7 +80,7 @@ function DocumentTree({ documents, currentSlug, level = 0 }: { documents: Docume
             >
               {hasChildren && (
                 <button
-                  onClick={() => toggleExpand(doc.id)}
+                  onClick={() => onToggle(doc.id)}
                   className="p-0.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded"
                 >
                   <ChevronDown
@@ -86,6 +101,8 @@ function DocumentTree({ documents, currentSlug, level = 0 }: { documents: Docume
               <DocumentTree
                 documents={doc.children}
                 currentSlug={currentSlug}
+                expanded={expanded}
+                onToggle={onToggle}
                 level={level + 1}
               />
             )}
@@ -129,6 +146,44 @@ function TOC({ content }: { content: string }) {
 export default function DocumentPageClient({ document, documentTree }: DocumentPageProps) {
   const [leftSidebarOpen, setLeftSidebarOpen] = useState(true)
   const [rightSidebarOpen, setRightSidebarOpen] = useState(true)
+  const ancestorIds = useMemo(() => findAncestorIdsBySlug(documentTree, document.slug), [documentTree, document.slug])
+  const [expanded, setExpanded] = useState<Set<string>>(() => {
+    if (typeof window === 'undefined') {
+      return new Set(ancestorIds)
+    }
+
+    const stored = sessionStorage.getItem(DOC_TREE_EXPANDED_KEY)
+    if (!stored) {
+      return new Set(ancestorIds)
+    }
+
+    try {
+      const parsed = JSON.parse(stored)
+      if (Array.isArray(parsed)) {
+        return new Set(parsed)
+      }
+    } catch {
+      // Ignore invalid storage data and fallback to ancestors
+    }
+
+    return new Set(ancestorIds)
+  })
+
+  useEffect(() => {
+    sessionStorage.setItem(DOC_TREE_EXPANDED_KEY, JSON.stringify(Array.from(expanded)))
+  }, [expanded])
+
+  const toggleExpand = (id: string) => {
+    setExpanded(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50/30 dark:from-slate-950 dark:via-slate-900 dark:to-indigo-950/30">
@@ -150,7 +205,7 @@ export default function DocumentPageClient({ document, documentTree }: DocumentP
               <span className="text-sm hidden sm:inline">返回首页</span>
             </Link>
           </div>
-          
+
           <div className="flex items-center gap-4">
             <button
               onClick={() => setRightSidebarOpen(!rightSidebarOpen)}
@@ -170,7 +225,7 @@ export default function DocumentPageClient({ document, documentTree }: DocumentP
           <div className="h-[calc(100vh-56px)] overflow-y-auto sticky top-14">
             <div className="p-4">
               <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-4">文档目录</h2>
-              <DocumentTree documents={documentTree} currentSlug={document.slug} />
+              <DocumentTree documents={documentTree} currentSlug={document.slug} expanded={expanded} onToggle={toggleExpand} />
             </div>
           </div>
         </aside>

@@ -28,6 +28,25 @@ interface ApiData {
   response: string
 }
 
+interface ApiDocument {
+  id: string
+  title: string
+  parentId: string | null
+  categoryId: string
+  order: number
+}
+
+interface DocumentTreeNode extends ApiDocument {
+  children: DocumentTreeNode[]
+}
+
+interface DocumentOption {
+  id: string
+  title: string
+  level: number
+  categoryId: string
+}
+
 const defaultApiData: ApiData = {
   name: '',
   description: '',
@@ -52,39 +71,36 @@ export default function EditDocumentPage({ params }: PageProps) {
   const [showApiModal, setShowApiModal] = useState(false)
   const [apiData, setApiData] = useState<ApiData>(defaultApiData)
   const [parentId, setParentId] = useState<string | null>(null)
-  const [categoryId, setCategoryId] = useState<string | null>(null)
-  const [documents, setDocuments] = useState<{ id: string; title: string; level: number }[]>([])
+  const [categoryId, setCategoryId] = useState('')
+  const [order, setOrder] = useState(0)
+  const [documents, setDocuments] = useState<DocumentOption[]>([])
+  const [rawDocuments, setRawDocuments] = useState<ApiDocument[]>([])
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([])
 
-  useEffect(() => {
-    params.then(({ id }) => {
-      setId(id)
-      fetchDocument(id)
-      fetchDocuments()
-      fetchCategories()
-    })
-  }, [params])
-
-  const fetchCategories = async () => {
+  async function fetchCategories() {
     try {
       const res = await fetch('/api/categories')
       if (res.ok) {
-        setCategories(await res.json())
+        const categoryData = await res.json()
+        setCategories(categoryData)
       }
     } catch (error) {
       console.error('Failed to fetch categories:', error)
     }
   }
 
-  const fetchDocuments = async () => {
+  async function fetchDocuments() {
     try {
       const res = await fetch('/api/documents')
       if (res.ok) {
-        const docs = await res.json()
-        const docMap = new Map(docs.map((d: any) => [d.id, { ...d, children: [] as any[] }]))
-        const roots: any[] = []
+        const docs: ApiDocument[] = await res.json()
+        setRawDocuments(docs)
+        const docMap = new Map<string, DocumentTreeNode>(
+          docs.map((doc) => [doc.id, { ...doc, children: [] }])
+        )
+        const roots: DocumentTreeNode[] = []
         
-        docs.forEach((doc: any) => {
+        docs.forEach((doc) => {
           const node = docMap.get(doc.id)!
           if (doc.parentId && docMap.has(doc.parentId)) {
             docMap.get(doc.parentId)!.children.push(node)
@@ -93,10 +109,10 @@ export default function EditDocumentPage({ params }: PageProps) {
           }
         })
         
-        const flattenWithLevel = (items: any[], level = 0): { id: string; title: string; level: number }[] => {
-          const result: { id: string; title: string; level: number }[] = []
+        const flattenWithLevel = (items: DocumentTreeNode[], level = 0): DocumentOption[] => {
+          const result: DocumentOption[] = []
           items.forEach(item => {
-            result.push({ id: item.id, title: item.title, level })
+            result.push({ id: item.id, title: item.title, level, categoryId: item.categoryId })
             if (item.children && item.children.length > 0) {
               result.push(...flattenWithLevel(item.children, level + 1))
             }
@@ -111,7 +127,7 @@ export default function EditDocumentPage({ params }: PageProps) {
     }
   }
 
-  const fetchDocument = async (docId: string) => {
+  async function fetchDocument(docId: string) {
     try {
       const res = await fetch(`/api/documents/${docId}`)
       if (res.ok) {
@@ -120,7 +136,8 @@ export default function EditDocumentPage({ params }: PageProps) {
         setContent(doc.content)
         setPublished(doc.published)
         setParentId(doc.parentId)
-        setCategoryId(doc.categoryId)
+        setCategoryId(doc.categoryId || '')
+        setOrder(doc.order || 0)
         setEditorReady(true)
       }
     } catch (error) {
@@ -131,6 +148,14 @@ export default function EditDocumentPage({ params }: PageProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    const effectiveCategoryId = parentDocument?.categoryId || categoryId
+
+    if (!effectiveCategoryId) {
+      alert('请选择文档分类')
+      return
+    }
+
     setSaving(true)
 
     try {
@@ -143,7 +168,8 @@ export default function EditDocumentPage({ params }: PageProps) {
           content,
           published,
           parentId,
-          categoryId,
+          order,
+          categoryId: effectiveCategoryId,
         }),
       })
 
@@ -159,6 +185,38 @@ export default function EditDocumentPage({ params }: PageProps) {
     setSaving(false)
   }
 
+  useEffect(() => {
+    params.then(({ id }) => {
+      setId(id)
+      fetchDocument(id)
+      fetchDocuments()
+      fetchCategories()
+    })
+  }, [params])
+
+  const getDescendantIds = (documentId: string) => {
+    const descendantIds = new Set<string>()
+    const queue = [documentId]
+
+    while (queue.length > 0) {
+      const currentId = queue.shift()!
+      rawDocuments.forEach((document) => {
+        if (document.parentId === currentId && !descendantIds.has(document.id)) {
+          descendantIds.add(document.id)
+          queue.push(document.id)
+        }
+      })
+    }
+
+    return descendantIds
+  }
+
+  const descendantIds = id ? getDescendantIds(id) : new Set<string>()
+  const selectableDocuments = documents.filter((document) => document.id !== id && !descendantIds.has(document.id))
+  const parentDocument = parentId ? documents.find((document) => document.id === parentId) : null
+  const isChildDocument = Boolean(parentId)
+  const effectiveCategoryId = parentDocument?.categoryId || categoryId
+
   const addParam = (type: 'params' | 'headers') => {
     setApiData(prev => ({
       ...prev,
@@ -166,7 +224,7 @@ export default function EditDocumentPage({ params }: PageProps) {
     }))
   }
 
-  const updateParam = (type: 'params' | 'headers', index: number, field: keyof ApiParam, value: any) => {
+  const updateParam = (type: 'params' | 'headers', index: number, field: keyof ApiParam, value: string | boolean) => {
     setApiData(prev => ({
       ...prev,
       [type]: prev[type].map((p, i) => i === index ? { ...p, [field]: value } : p)
@@ -305,17 +363,24 @@ export default function EditDocumentPage({ params }: PageProps) {
                     分类
                   </label>
                   <select
-                    value={categoryId || ''}
-                    onChange={(e) => setCategoryId(e.target.value || null)}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                    value={effectiveCategoryId}
+                    onChange={(e) => setCategoryId(e.target.value)}
+                    required
+                    disabled={isChildDocument}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all disabled:opacity-60 disabled:cursor-not-allowed"
                   >
-                    <option value="">无分类</option>
+                    <option value="" disabled>请选择分类</option>
                     {categories.map((cat) => (
                       <option key={cat.id} value={cat.id}>
                         {cat.name}
                       </option>
                     ))}
                   </select>
+                  {isChildDocument && (
+                    <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                      子文档自动继承顶级文档分类，不能单独修改。
+                    </p>
+                  )}
                 </div>
                 
                 <div>
@@ -328,12 +393,24 @@ export default function EditDocumentPage({ params }: PageProps) {
                     className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
                   >
                     <option value="">无（顶级文档）</option>
-                    {documents.filter(d => d.id !== id).map((doc) => (
+                    {selectableDocuments.map((doc) => (
                       <option key={doc.id} value={doc.id}>
                         {'　'.repeat(doc.level)}{doc.level > 0 ? '└ ' : ''}{doc.title}
                       </option>
                     ))}
                   </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-2 uppercase tracking-wide">
+                    排序
+                  </label>
+                  <input
+                    type="number"
+                    value={order}
+                    onChange={(e) => setOrder(Number(e.target.value) || 0)}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                  />
                 </div>
               </div>
             </div>
@@ -419,7 +496,9 @@ export default function EditDocumentPage({ params }: PageProps) {
                     </label>
                     <select
                       value={apiData.method}
-                      onChange={(e) => setApiData(prev => ({ ...prev, method: e.target.value as any }))}
+                      onChange={(e) =>
+                        setApiData((prev) => ({ ...prev, method: e.target.value as ApiData['method'] }))
+                      }
                       className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="GET">GET</option>

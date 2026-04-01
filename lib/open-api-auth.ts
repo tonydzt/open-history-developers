@@ -8,45 +8,33 @@ import { verifyOpenApiSignature } from './rsa-sign'
 export async function openApiAuth(request: NextRequest) {
   try {
     // 1. 从请求头或查询参数获取签名信息
-    const appId = request.headers.get('x-app-id') || request.nextUrl.searchParams.get('appId')
+    const userId = request.headers.get('x-user-id') || request.nextUrl.searchParams.get('userId')
     const timestamp = request.headers.get('x-timestamp') || request.nextUrl.searchParams.get('timestamp')
     const sign = request.headers.get('x-sign') || request.nextUrl.searchParams.get('sign')
 
-    if (!appId || !timestamp || !sign) {
+    if (!userId || !timestamp || !sign) {
       return {
         valid: false,
         response: NextResponse.json(
-          { error: 'Missing authentication parameters. Required: appId, timestamp, sign' },
+          { error: 'Missing authentication parameters. Required: userId, timestamp, sign' },
           { status: 401 }
         ),
       }
     }
 
-    // 2. 查询API Key
-    const apiKey = await prisma.apiKey.findUnique({
-      where: { appId },
+    // 2. 查询用户开放API凭证
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        openApiPublicKey: true,
+      },
     })
 
-    if (!apiKey) {
+    if (!user || !user.openApiPublicKey) {
       return {
         valid: false,
-        response: NextResponse.json({ error: 'Invalid appId' }, { status: 401 }),
-      }
-    }
-
-    // 3. 检查API Key状态
-    if (!apiKey.isActive) {
-      return {
-        valid: false,
-        response: NextResponse.json({ error: 'API Key is disabled' }, { status: 403 }),
-      }
-    }
-
-    // 4. 检查过期时间
-    if (apiKey.expiresAt && new Date() > apiKey.expiresAt) {
-      return {
-        valid: false,
-        response: NextResponse.json({ error: 'API Key has expired' }, { status: 403 }),
+        response: NextResponse.json({ error: 'Invalid userId or public key not configured' }, { status: 401 }),
       }
     }
 
@@ -61,13 +49,13 @@ export async function openApiAuth(request: NextRequest) {
       }
     }
 
-    // 6. 验证签名
+    // 3. 验证签名
     const verifyResult = verifyOpenApiSignature({
-      appId,
+      userId,
       timestamp,
       sign,
       body,
-      publicKey: apiKey.publicKey,
+      publicKey: user.openApiPublicKey,
     })
 
     if (!verifyResult.valid) {
@@ -77,13 +65,10 @@ export async function openApiAuth(request: NextRequest) {
       }
     }
 
-    // 7. 更新最后使用时间
-    await prisma.apiKey.update({
-      where: { id: apiKey.id },
-      data: { lastUsedAt: new Date() },
-    })
-
-    return { valid: true, apiKey }
+    return {
+      valid: true,
+      user: { id: user.id },
+    }
   } catch (error) {
     console.error('Open API auth error:', error)
     return {

@@ -1,53 +1,70 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Save, FileText } from 'lucide-react'
-import ByteMDEditor, { type ByteMDEditorRef } from '@/components/ByteMDEditor'
+import ByteMDEditor from '@/components/ByteMDEditor'
+
+interface ApiDocument {
+  id: string
+  title: string
+  parentId: string | null
+  categoryId: string
+  order: number
+}
+
+interface DocumentTreeNode extends ApiDocument {
+  children: DocumentTreeNode[]
+}
+
+interface DocumentOption {
+  id: string
+  title: string
+  level: number
+  categoryId: string
+}
 
 export default function NewDocumentPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const editorRef = useRef<ByteMDEditorRef>(null)
+  const requestedParentId = searchParams.get('parentId')
   const [title, setTitle] = useState('')
   const [published, setPublished] = useState(false)
   const [content, setContent] = useState('')
   const [saving, setSaving] = useState(false)
-  const [documents, setDocuments] = useState<{ id: string; title: string; level: number }[]>([])
+  const [documents, setDocuments] = useState<DocumentOption[]>([])
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([])
-  const [categoryId, setCategoryId] = useState<string | null>(null)
-  const [parentId, setParentId] = useState<string | null>(null)
+  const [categoryId, setCategoryId] = useState('')
+  const [parentId, setParentId] = useState<string | null>(requestedParentId)
+  const [order, setOrder] = useState(0)
 
-  useEffect(() => {
-    const parent = searchParams.get('parentId')
-    if (parent) {
-      setParentId(parent)
-    }
-    fetchDocuments()
-    fetchCategories()
-  }, [searchParams])
-
-  const fetchCategories = async () => {
+  async function fetchCategories() {
     try {
       const res = await fetch('/api/categories')
       if (res.ok) {
-        setCategories(await res.json())
+        const categoryData = await res.json()
+        setCategories(categoryData)
+        if (categoryData.length > 0) {
+          setCategoryId((current) => current || categoryData[0].id)
+        }
       }
     } catch (error) {
       console.error('Failed to fetch categories:', error)
     }
   }
 
-  const fetchDocuments = async () => {
+  async function fetchDocuments() {
     try {
       const res = await fetch('/api/documents')
       if (res.ok) {
-        const docs = await res.json()
-        const docMap = new Map(docs.map((d: any) => [d.id, { ...d, children: [] as any[] }]))
-        const roots: any[] = []
+        const docs: ApiDocument[] = await res.json()
+        const docMap = new Map<string, DocumentTreeNode>(
+          docs.map((doc) => [doc.id, { ...doc, children: [] }])
+        )
+        const roots: DocumentTreeNode[] = []
         
-        docs.forEach((doc: any) => {
+        docs.forEach((doc) => {
           const node = docMap.get(doc.id)!
           if (doc.parentId && docMap.has(doc.parentId)) {
             docMap.get(doc.parentId)!.children.push(node)
@@ -56,10 +73,10 @@ export default function NewDocumentPage() {
           }
         })
         
-        const flattenWithLevel = (items: any[], level = 0): { id: string; title: string; level: number }[] => {
-          const result: { id: string; title: string; level: number }[] = []
+        const flattenWithLevel = (items: DocumentTreeNode[], level = 0): DocumentOption[] => {
+          const result: DocumentOption[] = []
           items.forEach(item => {
-            result.push({ id: item.id, title: item.title, level })
+            result.push({ id: item.id, title: item.title, level, categoryId: item.categoryId })
             if (item.children && item.children.length > 0) {
               result.push(...flattenWithLevel(item.children, level + 1))
             }
@@ -90,6 +107,13 @@ export default function NewDocumentPage() {
       alert('请输入文档标题')
       return
     }
+
+    const effectiveCategoryId = parentDocument?.categoryId || categoryId
+
+    if (!effectiveCategoryId) {
+      alert('请选择文档分类')
+      return
+    }
     
     setSaving(true)
 
@@ -104,7 +128,8 @@ export default function NewDocumentPage() {
           content,
           published,
           parentId,
-          categoryId,
+          order,
+          categoryId: effectiveCategoryId,
         }),
       })
 
@@ -120,6 +145,16 @@ export default function NewDocumentPage() {
     }
     setSaving(false)
   }
+
+  useEffect(() => {
+    void (async () => {
+      await Promise.all([fetchDocuments(), fetchCategories()])
+    })()
+  }, [])
+
+  const parentDocument = parentId ? documents.find((document) => document.id === parentId) : null
+  const isChildDocument = Boolean(parentId)
+  const effectiveCategoryId = parentDocument?.categoryId || categoryId
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50/30 dark:from-slate-950 dark:via-slate-900 dark:to-indigo-950/30">
@@ -182,17 +217,24 @@ export default function NewDocumentPage() {
                     分类
                   </label>
                   <select
-                    value={categoryId || ''}
-                    onChange={(e) => setCategoryId(e.target.value || null)}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                    value={effectiveCategoryId}
+                    onChange={(e) => setCategoryId(e.target.value)}
+                    required
+                    disabled={isChildDocument}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all disabled:opacity-60 disabled:cursor-not-allowed"
                   >
-                    <option value="">无分类</option>
+                    <option value="" disabled>请选择分类</option>
                     {categories.map((cat) => (
                       <option key={cat.id} value={cat.id}>
                         {cat.name}
                       </option>
                     ))}
                   </select>
+                  {isChildDocument && (
+                    <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                      子文档自动继承顶级文档分类，不能单独修改。
+                    </p>
+                  )}
                 </div>
                 
                 <div>
@@ -211,6 +253,18 @@ export default function NewDocumentPage() {
                       </option>
                     ))}
                   </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-2 uppercase tracking-wide">
+                    排序
+                  </label>
+                  <input
+                    type="number"
+                    value={order}
+                    onChange={(e) => setOrder(Number(e.target.value) || 0)}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                  />
                 </div>
               </div>
             </div>

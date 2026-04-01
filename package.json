@@ -7,9 +7,12 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "mcp:start": "tsx mcp/server.ts",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
-    "db:seed": "tsx prisma/seed.ts"
+    "db:seed": "tsx prisma/seed.ts",
+    "docs:publish:openapi": "node scripts/publish-open-api-docs.js",
+    "docs:publish:mcp": "node scripts/publish-mcp-docs.js"
   },
   "dependencies": {
     "@bytemd/plugin-frontmatter": "^1.22.0",

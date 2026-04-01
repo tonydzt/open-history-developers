@@ -4,8 +4,13 @@ import { prisma } from '@/lib/prisma'
 export default async function Home() {
   const documents = await prisma.document.findMany({
     where: { published: true },
-    include: { category: true, author: true },
-    orderBy: { createdAt: 'desc' }
+    include: {
+      category: true,
+      author: {
+        select: { id: true, name: true, email: true },
+      },
+    },
+    orderBy: [{ order: 'asc' }, { updatedAt: 'desc' }, { title: 'asc' }],
   })
 
   return (
@@ -25,7 +30,7 @@ export default async function Home() {
         </div>
 
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {documents.map((doc, index) => (
+          {documents.map((doc) => (
             <Link
               key={doc.id}
               href={`/docs/${doc.slug}`}

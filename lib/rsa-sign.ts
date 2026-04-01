@@ -22,8 +22,11 @@ export function generateRSAKeyPair(): { publicKey: string; privateKey: string } 
 /**
  * 生成请求体的hash值
  */
-export function generateBodyHash(body: any): string {
-  if (!body || Object.keys(body).length === 0) {
+export function generateBodyHash(body: unknown): string {
+  if (body === null || body === undefined) {
+    return ''
+  }
+  if (typeof body === 'object' && Object.keys(body as Record<string, unknown>).length === 0) {
     return ''
   }
   const bodyString = JSON.stringify(body)
@@ -32,10 +35,10 @@ export function generateBodyHash(body: any): string {
 
 /**
  * 生成签名内容
- * sign = RSA私钥签名(appId + timestamp + 请求体hash)
+ * sign = RSA私钥签名(userId + timestamp + 请求体hash)
  */
-export function generateSignContent(appId: string, timestamp: string, bodyHash: string): string {
-  return `${appId}${timestamp}${bodyHash}`
+export function generateSignContent(userId: string, timestamp: string, bodyHash: string): string {
+  return `${userId}${timestamp}${bodyHash}`
 }
 
 /**
@@ -67,10 +70,10 @@ export function verifyWithPublicKey(publicKey: string, content: string, signatur
  * 验证开放API请求签名
  */
 export interface VerifySignatureParams {
-  appId: string
+  userId: string
   timestamp: string
   sign: string
-  body?: any
+  body?: unknown
   publicKey: string
 }
 
@@ -80,11 +83,11 @@ export interface VerifySignatureResult {
 }
 
 export function verifyOpenApiSignature(params: VerifySignatureParams): VerifySignatureResult {
-  const { appId, timestamp, sign, body, publicKey } = params
+  const { userId, timestamp, sign, body, publicKey } = params
 
   // 1. 检查必需参数
-  if (!appId || !timestamp || !sign) {
-    return { valid: false, error: 'Missing required parameters: appId, timestamp, or sign' }
+  if (!userId || !timestamp || !sign) {
+    return { valid: false, error: 'Missing required parameters: userId, timestamp, or sign' }
   }
 
   // 2. 检查时间戳有效性（防止重放攻击，允许5分钟误差）
@@ -99,7 +102,7 @@ export function verifyOpenApiSignature(params: VerifySignatureParams): VerifySig
 
   // 3. 生成签名内容
   const bodyHash = generateBodyHash(body)
-  const signContent = generateSignContent(appId, timestamp, bodyHash)
+  const signContent = generateSignContent(userId, timestamp, bodyHash)
 
   // 4. 验证签名
   const isValid = verifyWithPublicKey(publicKey, signContent, sign)
@@ -109,11 +112,4 @@ export function verifyOpenApiSignature(params: VerifySignatureParams): VerifySig
   }
 
   return { valid: true }
-}
-
-/**
- * 生成随机appId
- */
-export function generateAppId(): string {
-  return `app_${crypto.randomBytes(16).toString('hex')}`
 }

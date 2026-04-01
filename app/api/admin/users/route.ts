@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth/next'
 import { prisma } from '@/lib/prisma'
 import { authOptions } from '@/lib/auth'
 import bcrypt from 'bcryptjs'
+import { generateRSAKeyPair } from '@/lib/rsa-sign'
 
 export async function GET() {
   const session = await getServerSession(authOptions)
@@ -16,7 +17,14 @@ export async function GET() {
   }
 
   const users = await prisma.user.findMany({
-    select: { id: true, email: true, name: true, role: true, createdAt: true },
+    select: {
+      id: true,
+      email: true,
+      name: true,
+      role: true,
+      createdAt: true,
+      openApiPrivateKey: true,
+    },
     orderBy: { createdAt: 'desc' }
   })
   return NextResponse.json(users)
@@ -53,6 +61,7 @@ export async function POST(request: Request) {
   }
 
   const hashedPassword = await bcrypt.hash(password, 10)
+  const { publicKey, privateKey } = generateRSAKeyPair()
 
   const user = await prisma.user.create({
     data: {
@@ -60,6 +69,8 @@ export async function POST(request: Request) {
       name: name || email.split('@')[0],
       password: hashedPassword,
       role,
+      openApiPublicKey: publicKey,
+      openApiPrivateKey: privateKey,
     }
   })
 
@@ -68,5 +79,6 @@ export async function POST(request: Request) {
     email: user.email,
     name: user.name,
     role: user.role,
+    openApiPrivateKey: user.openApiPrivateKey,
   })
 }
