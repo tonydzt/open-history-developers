@@ -9,8 +9,10 @@
     "lint": "eslint",
     "mcp:start": "tsx mcp/server.ts",
     "db:generate": "prisma generate",
-    "db:migrate": "prisma migrate dev",
+    "db:migrate": "prisma migrate deploy",
+    "db:migrate:dev": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
+    "db:migrate:sqlite-to-postgres": "tsx prisma/migrate-sqlite-to-postgres.ts",
     "docs:publish:openapi": "node scripts/publish-open-api-docs.js",
     "docs:publish:mcp": "node scripts/publish-mcp-docs.js"
   },
