@@ -6,6 +6,8 @@ import { prisma } from '@/lib/prisma'
 import { authOptions } from '@/lib/auth'
 import AdminDocumentsTableClient from '@/components/AdminDocumentsTableClient'
 import { AdminDocumentsCategoryFilter, AdminDocumentsPageSizeSelect } from '@/components/AdminDocumentsQueryControls'
+import { getServerLocale } from '@/lib/i18n-server'
+import { localizeCategory, localizeDocument } from '@/lib/content-i18n'
 
 type DocumentWithRelations = Prisma.DocumentGetPayload<{
   include: {
@@ -142,6 +144,7 @@ export default async function AdminDocumentsPage({
   searchParams: Promise<{ categoryId?: string; page?: string; pageSize?: string }>
 }) {
   const session = await getServerSession(authOptions)
+  const locale = await getServerLocale()
 
   if (!session) {
     redirect('/login')
@@ -153,8 +156,9 @@ export default async function AdminDocumentsPage({
   const pageSize = PAGE_SIZE_OPTIONS.includes(pageSizeInput) ? pageSizeInput : DEFAULT_PAGE_SIZE
 
   const categories = await getCategories()
+  const localizedCategories = categories.map((category) => localizeCategory(category, locale))
   const selectedCategory = categoryId
-    ? categories.find((category) => category.id === categoryId) || null
+    ? localizedCategories.find((category) => category.id === categoryId) || null
     : null
 
   const paginationResult = await getDocumentsPage({
@@ -191,23 +195,27 @@ export default async function AdminDocumentsPage({
 
         <div className="mb-6 flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white/80 dark:bg-slate-900/50 backdrop-blur-sm px-4 py-4 shadow-xl shadow-slate-200/50 dark:shadow-slate-900/50">
           <AdminDocumentsCategoryFilter
-            categories={categories.map((category) => ({ id: category.id, name: category.name }))}
+            categories={localizedCategories.map((category) => ({ id: category.id, name: category.name }))}
             selectedCategoryId={selectedCategory?.id || ''}
           />
         </div>
 
         <div className="bg-white/80 dark:bg-slate-900/50 backdrop-blur-sm rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-xl shadow-slate-200/50 dark:shadow-slate-900/50 overflow-hidden">
           <AdminDocumentsTableClient
-            documents={paginationResult.docs.map((doc) => ({
-              id: doc.id,
-              title: doc.title,
-              slug: doc.slug,
-              order: doc.order,
-              published: doc.published,
-              updatedAt: doc.updatedAt.toISOString(),
-              level: doc.level,
-              category: doc.category ? { name: doc.category.name } : null,
-            }))}
+            documents={paginationResult.docs.map((source) => {
+              const doc = localizeDocument(source, locale)
+              const category = doc.category ? localizeCategory(doc.category, locale) : null
+              return {
+                id: doc.id,
+                title: doc.title,
+                slug: doc.slug,
+                order: doc.order,
+                published: doc.published,
+                updatedAt: doc.updatedAt.toISOString(),
+                level: doc.level,
+                category: category ? { name: category.name } : null,
+              }
+            })}
           />
 
           {paginationResult.docs.length === 0 && (

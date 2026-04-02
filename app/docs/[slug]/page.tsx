@@ -1,6 +1,8 @@
 import { notFound } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import DocumentPageClient from '@/components/DocumentPageClient'
+import { getServerLocale } from '@/lib/i18n-server'
+import { localizeCategory, localizeDocument } from '@/lib/content-i18n'
 
 interface PageProps {
   params: Promise<{ slug: string }>
@@ -15,12 +17,14 @@ type DocumentTreeItem = {
   children: DocumentTreeItem[]
 }
 
-async function getDocumentTreeByRoot(currentDocumentId: string) {
+async function getDocumentTreeByRoot(currentDocumentId: string, locale: 'en' | 'zh') {
   const docs = await prisma.document.findMany({
     where: { published: true },
     select: {
       id: true,
       title: true,
+      titleEn: true,
+      titleZh: true,
       slug: true,
       parentId: true,
       order: true,
@@ -28,10 +32,11 @@ async function getDocumentTreeByRoot(currentDocumentId: string) {
     orderBy: [{ order: 'asc' }, { title: 'asc' }],
   })
 
-  const docMap = new Map<string, DocumentTreeItem>(docs.map((d) => [d.id, { ...d, children: [] }]))
-  const parentMap = new Map<string, string | null>(docs.map((d) => [d.id, d.parentId]))
+  const localizedDocs = docs.map((doc) => localizeDocument(doc, locale))
+  const docMap = new Map<string, DocumentTreeItem>(localizedDocs.map((d) => [d.id, { ...d, children: [] }]))
+  const parentMap = new Map<string, string | null>(localizedDocs.map((d) => [d.id, d.parentId]))
 
-  docs.forEach(doc => {
+  localizedDocs.forEach(doc => {
     if (doc.parentId && docMap.has(doc.parentId)) {
       docMap.get(doc.parentId)!.children.push(docMap.get(doc.id)!)
     }
@@ -53,6 +58,7 @@ async function getDocumentTreeByRoot(currentDocumentId: string) {
 }
 
 export default async function DocumentPage({ params }: PageProps) {
+  const locale = await getServerLocale()
   const { slug } = await params
   const decodedSlug = decodeURIComponent(slug)
 
@@ -71,7 +77,15 @@ export default async function DocumentPage({ params }: PageProps) {
     notFound()
   }
 
-  const documentTree = await getDocumentTreeByRoot(document.id)
+  const documentTree = await getDocumentTreeByRoot(document.id, locale)
+  const localizedDocument = localizeDocument(
+    {
+      ...document,
+      category: document.category ? localizeCategory(document.category, locale) : null,
+      children: document.children.map((child) => localizeDocument(child, locale)),
+    },
+    locale
+  )
 
   await prisma.document.update({
     where: { id: document.id },
@@ -81,15 +95,15 @@ export default async function DocumentPage({ params }: PageProps) {
   return (
     <DocumentPageClient
       document={{
-        id: document.id,
-        title: document.title,
-        slug: document.slug,
-        content: document.content,
-        viewCount: document.viewCount,
-        updatedAt: document.updatedAt.toISOString(),
-        author: { name: document.author.name, email: document.author.email },
-        category: document.category ? { name: document.category.name } : null,
-        children: document.children.map(c => ({ id: c.id, title: c.title, slug: c.slug }))
+        id: localizedDocument.id,
+        title: localizedDocument.title,
+        slug: localizedDocument.slug,
+        content: localizedDocument.content,
+        viewCount: localizedDocument.viewCount,
+        updatedAt: localizedDocument.updatedAt.toISOString(),
+        author: { name: localizedDocument.author.name, email: localizedDocument.author.email },
+        category: localizedDocument.category ? { name: localizedDocument.category.name } : null,
+        children: localizedDocument.children.map(c => ({ id: c.id, title: c.title, slug: c.slug }))
       }}
       documentTree={documentTree}
     />

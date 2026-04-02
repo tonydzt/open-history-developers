@@ -342,10 +342,14 @@ async function main() {
     where: { name: CATEGORY_NAME },
     update: {
       description: '面向大模型与智能体的 MCP 接入说明、工具清单与鉴权文档。',
+      nameZh: CATEGORY_NAME,
+      descriptionZh: '面向大模型与智能体的 MCP 接入说明、工具清单与鉴权文档。',
     },
     create: {
       name: CATEGORY_NAME,
+      nameZh: CATEGORY_NAME,
       description: '面向大模型与智能体的 MCP 接入说明、工具清单与鉴权文档。',
+      descriptionZh: '面向大模型与智能体的 MCP 接入说明、工具清单与鉴权文档。',
     },
   })
 
@@ -356,8 +360,11 @@ async function main() {
       where: { slug: doc.slug },
       update: {
         title: doc.title,
+        titleZh: doc.title,
         excerpt: doc.excerpt,
+        excerptZh: doc.excerpt,
         content: doc.content,
+        contentZh: doc.content,
         order: doc.order,
         published: true,
         authorId: author.id,
@@ -365,9 +372,12 @@ async function main() {
       },
       create: {
         title: doc.title,
+        titleZh: doc.title,
         slug: doc.slug,
         excerpt: doc.excerpt,
+        excerptZh: doc.excerpt,
         content: doc.content,
+        contentZh: doc.content,
         order: doc.order,
         published: true,
         authorId: author.id,

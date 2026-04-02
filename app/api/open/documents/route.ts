@@ -3,6 +3,8 @@ import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { openApiAuth } from '@/lib/open-api-auth'
 import { getTopLevelCategoryId } from '@/lib/document-category'
+import { getLocaleFromRequest } from '@/lib/i18n-server'
+import { localizeCategory, localizeDocument, resolveLocalizedDocumentInput } from '@/lib/content-i18n'
 
 /**
  * GET /api/open/documents - 获取文档列表
@@ -15,6 +17,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    const locale = getLocaleFromRequest(request)
     const { searchParams } = request.nextUrl
     const page = parseInt(searchParams.get('page') || '1', 10)
     const pageSize = parseInt(searchParams.get('pageSize') || '20', 10)
@@ -30,13 +33,13 @@ export async function GET(request: NextRequest) {
         where,
         include: {
           category: {
-            select: { id: true, name: true },
+            select: { id: true, name: true, nameEn: true, nameZh: true },
           },
           author: {
             select: { id: true, name: true, email: true },
           },
           children: {
-            select: { id: true, title: true, slug: true, order: true },
+            select: { id: true, title: true, titleEn: true, titleZh: true, slug: true, order: true },
           },
         },
         orderBy: [{ order: 'asc' }, { title: 'asc' }, { updatedAt: 'desc' }],
@@ -47,7 +50,16 @@ export async function GET(request: NextRequest) {
     ])
 
     return NextResponse.json({
-      data: documents,
+      data: documents.map((document) =>
+        localizeDocument(
+          {
+            ...document,
+            category: document.category ? localizeCategory(document.category, locale) : null,
+            children: document.children.map((child) => localizeDocument(child, locale)),
+          },
+          locale
+        )
+      ),
       pagination: {
         page,
         pageSize,
@@ -73,7 +85,9 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json()
-    const { title, slug, content, excerpt, order, published, parentId, categoryId, authorId } = body
+    const { slug, order, published, parentId, categoryId, authorId } = body
+    const localized = resolveLocalizedDocumentInput(body)
+    const title = localized.title
 
     if (!title) {
       return NextResponse.json({ error: 'Title is required' }, { status: 400 })
@@ -123,9 +137,15 @@ export async function POST(request: NextRequest) {
     const document = await prisma.document.create({
       data: {
         title,
+        titleEn: localized.titleEn,
+        titleZh: localized.titleZh,
         slug: slug || title.toLowerCase().replace(/[^a-z0-9\u4e00-\u9fa5]+/g, '-').replace(/^-+|-+$/g, ''),
-        content: content || '',
-        excerpt,
+        content: localized.content,
+        contentEn: localized.contentEn,
+        contentZh: localized.contentZh,
+        excerpt: localized.excerpt,
+        excerptEn: localized.excerptEn,
+        excerptZh: localized.excerptZh,
         order: typeof order === 'number' ? order : 0,
         published: published || false,
         parentId: parentId || null,

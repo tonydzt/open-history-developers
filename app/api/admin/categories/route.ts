@@ -1,9 +1,12 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getAdminSession } from '@/lib/admin-auth'
+import { localizeCategory, resolveLocalizedCategoryInput } from '@/lib/content-i18n'
+import { getServerLocale } from '@/lib/i18n-server'
 
 export async function GET() {
   const { session, authorized } = await getAdminSession()
+  const locale = await getServerLocale()
 
   if (!session) {
     return NextResponse.json({ error: '未授权' }, { status: 401 })
@@ -22,7 +25,7 @@ export async function GET() {
     orderBy: { updatedAt: 'desc' },
   })
 
-  return NextResponse.json(categories)
+  return NextResponse.json(categories.map((category) => localizeCategory(category, locale)))
 }
 
 export async function POST(request: Request) {
@@ -37,8 +40,8 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json()
-  const name = typeof body.name === 'string' ? body.name.trim() : ''
-  const description = typeof body.description === 'string' ? body.description.trim() : ''
+  const localized = resolveLocalizedCategoryInput(body)
+  const name = localized.name
 
   if (!name) {
     return NextResponse.json({ error: '分类名称不能为空' }, { status: 400 })
@@ -55,7 +58,11 @@ export async function POST(request: Request) {
   const category = await prisma.category.create({
     data: {
       name,
-      description: description || null,
+      nameEn: localized.nameEn,
+      nameZh: localized.nameZh,
+      description: localized.description,
+      descriptionEn: localized.descriptionEn,
+      descriptionZh: localized.descriptionZh,
     },
     include: {
       _count: {

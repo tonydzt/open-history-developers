@@ -602,10 +602,14 @@ async function main() {
     where: { name: CATEGORY_NAME },
     update: {
       description: '平台对外开放 API 的使用说明、鉴权规则与接口参考。',
+      nameZh: CATEGORY_NAME,
+      descriptionZh: '平台对外开放 API 的使用说明、鉴权规则与接口参考。',
     },
     create: {
       name: CATEGORY_NAME,
+      nameZh: CATEGORY_NAME,
       description: '平台对外开放 API 的使用说明、鉴权规则与接口参考。',
+      descriptionZh: '平台对外开放 API 的使用说明、鉴权规则与接口参考。',
     },
   })
 
@@ -616,8 +620,11 @@ async function main() {
       where: { slug: doc.slug },
       update: {
         title: doc.title,
+        titleZh: doc.title,
         excerpt: doc.excerpt,
+        excerptZh: doc.excerpt,
         content: doc.content,
+        contentZh: doc.content,
         order: doc.order,
         published: true,
         authorId: author.id,
@@ -625,9 +632,12 @@ async function main() {
       },
       create: {
         title: doc.title,
+        titleZh: doc.title,
         slug: doc.slug,
         excerpt: doc.excerpt,
+        excerptZh: doc.excerpt,
         content: doc.content,
+        contentZh: doc.content,
         order: doc.order,
         published: true,
         authorId: author.id,

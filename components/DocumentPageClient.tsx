@@ -147,27 +147,25 @@ export default function DocumentPageClient({ document, documentTree }: DocumentP
   const [leftSidebarOpen, setLeftSidebarOpen] = useState(true)
   const [rightSidebarOpen, setRightSidebarOpen] = useState(true)
   const ancestorIds = useMemo(() => findAncestorIdsBySlug(documentTree, document.slug), [documentTree, document.slug])
-  const [expanded, setExpanded] = useState<Set<string>>(() => {
-    if (typeof window === 'undefined') {
-      return new Set(ancestorIds)
-    }
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set(ancestorIds))
 
+  useEffect(() => {
     const stored = sessionStorage.getItem(DOC_TREE_EXPANDED_KEY)
-    if (!stored) {
-      return new Set(ancestorIds)
-    }
+    if (!stored) return
 
     try {
       const parsed = JSON.parse(stored)
       if (Array.isArray(parsed)) {
-        return new Set(parsed)
+        const nextExpanded = new Set(parsed)
+        const timer = window.setTimeout(() => {
+          setExpanded(nextExpanded)
+        }, 0)
+        return () => window.clearTimeout(timer)
       }
     } catch {
-      // Ignore invalid storage data and fallback to ancestors
+      // Ignore invalid storage data and keep the SSR-compatible default state.
     }
-
-    return new Set(ancestorIds)
-  })
+  }, [])
 
   useEffect(() => {
     sessionStorage.setItem(DOC_TREE_EXPANDED_KEY, JSON.stringify(Array.from(expanded)))

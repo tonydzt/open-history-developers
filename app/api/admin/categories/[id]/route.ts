@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getAdminSession } from '@/lib/admin-auth'
+import { resolveLocalizedCategoryInput } from '@/lib/content-i18n'
 
 interface RouteContext {
   params: Promise<{ id: string }>
@@ -19,8 +20,8 @@ export async function PUT(request: Request, { params }: RouteContext) {
 
   const { id } = await params
   const body = await request.json()
-  const name = typeof body.name === 'string' ? body.name.trim() : ''
-  const description = typeof body.description === 'string' ? body.description.trim() : ''
+  const localized = resolveLocalizedCategoryInput(body)
+  const name = localized.name
 
   if (!name) {
     return NextResponse.json({ error: '分类名称不能为空' }, { status: 400 })
@@ -49,7 +50,11 @@ export async function PUT(request: Request, { params }: RouteContext) {
     where: { id },
     data: {
       name,
-      description: description || null,
+      nameEn: localized.nameEn,
+      nameZh: localized.nameZh,
+      description: localized.description,
+      descriptionEn: localized.descriptionEn,
+      descriptionZh: localized.descriptionZh,
     },
     include: {
       _count: {

@@ -2,12 +2,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getToken } from 'next-auth/jwt'
 import { prisma } from '@/lib/prisma'
 import { getDescendantIds, getTopLevelCategoryId, syncSubtreeCategory } from '@/lib/document-category'
+import { localizeCategory, localizeDocument, resolveLocalizedDocumentInput } from '@/lib/content-i18n'
+import { getLocaleFromRequest } from '@/lib/i18n-server'
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
+  const locale = getLocaleFromRequest(request)
   
   try {
     const document = await prisma.document.findUnique({
@@ -24,7 +27,15 @@ export async function GET(
       return NextResponse.json({ error: 'Document not found' }, { status: 404 })
     }
 
-    return NextResponse.json(document)
+    return NextResponse.json(
+      localizeDocument(
+        {
+          ...document,
+          category: document.category ? localizeCategory(document.category, locale) : null,
+        },
+        locale
+      )
+    )
   } catch {
     return NextResponse.json({ error: 'Failed to fetch document' }, { status: 500 })
   }
@@ -44,7 +55,15 @@ export async function PUT(
     }
 
     const body = await request.json()
-    const { title, slug, content, excerpt, order, published, parentId, categoryId } = body
+    const { slug, order, published, parentId, categoryId } = body
+    const localized = resolveLocalizedDocumentInput(body)
+    const hasTitleInput = body.title !== undefined || body.titleEn !== undefined || body.titleZh !== undefined
+    const hasContentInput = body.content !== undefined || body.contentEn !== undefined || body.contentZh !== undefined
+    const hasExcerptInput = body.excerpt !== undefined || body.excerptEn !== undefined || body.excerptZh !== undefined
+
+    if (hasTitleInput && !localized.title) {
+      return NextResponse.json({ error: 'Title is required' }, { status: 400 })
+    }
 
     const existingDocument = await prisma.document.findUnique({
       where: { id },
@@ -101,13 +120,25 @@ export async function PUT(
       const updatedDocument = await tx.document.update({
         where: { id },
         data: {
-          title,
-          slug,
-          content,
-          excerpt,
-          order,
-          published,
-          parentId: nextParentId,
+          ...(hasTitleInput && {
+            title: localized.title!,
+            titleEn: localized.titleEn,
+            titleZh: localized.titleZh,
+          }),
+          ...(slug !== undefined && { slug }),
+          ...(hasContentInput && {
+            content: localized.content,
+            contentEn: localized.contentEn,
+            contentZh: localized.contentZh,
+          }),
+          ...(hasExcerptInput && {
+            excerpt: localized.excerpt,
+            excerptEn: localized.excerptEn,
+            excerptZh: localized.excerptZh,
+          }),
+          ...(order !== undefined && { order }),
+          ...(published !== undefined && { published }),
+          ...(parentId !== undefined && { parentId: nextParentId }),
           categoryId: resolvedCategoryId,
         },
       })

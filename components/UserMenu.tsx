@@ -6,14 +6,35 @@ import { useRouter } from 'next/navigation'
 import { LogOut, ChevronDown, LayoutDashboard, KeyRound, Sparkles } from 'lucide-react'
 import Link from 'next/link'
 import { createPortal } from 'react-dom'
+import { type Locale } from '@/lib/i18n'
 
-export default function UserMenu() {
+export default function UserMenu({ locale = 'en' }: { locale?: Locale }) {
   const { data: session } = useSession()
   const router = useRouter()
   const [isOpen, setIsOpen] = useState(false)
   const [menuStyle, setMenuStyle] = useState<{ top: number; left: number }>({ top: 0, left: 0 })
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const triggerRef = useRef<HTMLDivElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
+
+  const clearCloseTimer = () => {
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current)
+      closeTimerRef.current = null
+    }
+  }
+
+  const openMenu = () => {
+    clearCloseTimer()
+    setIsOpen(true)
+  }
+
+  const closeMenu = () => {
+    clearCloseTimer()
+    closeTimerRef.current = setTimeout(() => {
+      setIsOpen(false)
+    }, 120)
+  }
 
   useEffect(() => {
     if (!isOpen) return
@@ -59,13 +80,25 @@ export default function UserMenu() {
 
   if (!session) return null
 
-  const roleLabels: Record<string, string> = {
-    SUPER_ADMIN: '超级管理员',
-    ADMIN: '管理员',
-    API_USER: 'API用户',
+  const roleLabels: Record<string, Record<string, string>> = {
+    en: { SUPER_ADMIN: 'Super Admin', ADMIN: 'Admin', API_USER: 'API User' },
+    zh: { SUPER_ADMIN: '超级管理员', ADMIN: '管理员', API_USER: 'API用户' },
   }
   const canUseDOM = typeof document !== 'undefined'
   const canAccessAdmin = session.user?.role === 'SUPER_ADMIN' || session.user?.role === 'ADMIN'
+  const labels = locale === 'zh'
+    ? {
+        accountCenter: '账户中心',
+        adminConsole: '后台管理',
+        myPrivateKey: '我的私钥',
+        signOut: '退出登录',
+      }
+    : {
+        accountCenter: 'Account Center',
+        adminConsole: 'Admin Console',
+        myPrivateKey: 'My Private Key',
+        signOut: 'Sign out',
+      }
 
   const menuContent = (
     <div
@@ -78,10 +111,10 @@ export default function UserMenu() {
           <div className="w-7 h-7 rounded-lg bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 flex items-center justify-center">
             <Sparkles className="w-3.5 h-3.5" />
           </div>
-          <div className="text-sm font-semibold text-slate-900 dark:text-white">账户中心</div>
+          <div className="text-sm font-semibold text-slate-900 dark:text-white">{labels.accountCenter}</div>
         </div>
         <div className="text-sm font-medium text-slate-900 dark:text-white truncate">{session.user?.email}</div>
-        <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">{roleLabels[session.user?.role || 'API_USER']}</div>
+        <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">{roleLabels[locale][session.user?.role || 'API_USER']}</div>
       </div>
 
       <div className="py-2 px-2">
@@ -92,7 +125,7 @@ export default function UserMenu() {
             onClick={() => setIsOpen(false)}
           >
             <LayoutDashboard className="w-4 h-4 text-slate-500 dark:text-slate-400" />
-            后台管理
+            {labels.adminConsole}
           </Link>
         )}
 
@@ -102,7 +135,7 @@ export default function UserMenu() {
           onClick={() => setIsOpen(false)}
         >
           <KeyRound className="w-4 h-4 text-slate-500 dark:text-slate-400" />
-          我的私钥
+          {labels.myPrivateKey}
         </Link>
       </div>
 
@@ -112,16 +145,15 @@ export default function UserMenu() {
           className="flex items-center gap-3 px-3 py-2.5 text-sm rounded-xl text-rose-700 dark:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-950/30 w-full transition-colors"
         >
           <LogOut className="w-4 h-4" />
-          退出登录
+          {labels.signOut}
         </button>
       </div>
     </div>
   )
 
   return (
-    <div className="relative" ref={triggerRef}>
+    <div className="relative" ref={triggerRef} onMouseEnter={openMenu} onMouseLeave={closeMenu}>
       <button
-        onClick={() => setIsOpen(!isOpen)}
         className={`flex items-center gap-2 px-3 py-2 rounded-xl border transition-colors ${
           isOpen
             ? 'bg-slate-100 border-slate-200 text-slate-900 dark:bg-slate-800 dark:border-slate-700 dark:text-white'
@@ -136,13 +168,20 @@ export default function UserMenu() {
             {session.user?.name || session.user?.email?.split('@')[0]}
           </div>
           <div className="text-xs text-slate-500 dark:text-slate-400">
-            {roleLabels[session.user?.role || 'API_USER']}
+            {roleLabels[locale][session.user?.role || 'API_USER']}
           </div>
         </div>
         <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
-      {canUseDOM && isOpen && createPortal(menuContent, document.body)}
+      {canUseDOM &&
+        isOpen &&
+        createPortal(
+          <div onMouseEnter={openMenu} onMouseLeave={closeMenu}>
+            {menuContent}
+          </div>,
+          document.body
+        )}
     </div>
   )
 }

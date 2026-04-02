@@ -10,6 +10,8 @@ import ByteMDEditor from '@/components/ByteMDEditor'
 interface ApiDocument {
   id: string
   title: string
+  titleEn?: string | null
+  titleZh?: string | null
   parentId: string | null
   categoryId: string
   order: number
@@ -30,9 +32,11 @@ function NewDocumentPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const requestedParentId = searchParams.get('parentId')
-  const [title, setTitle] = useState('')
+  const [titleEn, setTitleEn] = useState('')
+  const [titleZh, setTitleZh] = useState('')
   const [published, setPublished] = useState(false)
-  const [content, setContent] = useState('')
+  const [contentEn, setContentEn] = useState('')
+  const [contentZh, setContentZh] = useState('')
   const [saving, setSaving] = useState(false)
   const [documents, setDocuments] = useState<DocumentOption[]>([])
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([])
@@ -77,7 +81,12 @@ function NewDocumentPageContent() {
         const flattenWithLevel = (items: DocumentTreeNode[], level = 0): DocumentOption[] => {
           const result: DocumentOption[] = []
           items.forEach(item => {
-            result.push({ id: item.id, title: item.title, level, categoryId: item.categoryId })
+            result.push({
+              id: item.id,
+              title: item.titleZh || item.titleEn || item.title,
+              level,
+              categoryId: item.categoryId,
+            })
             if (item.children && item.children.length > 0) {
               result.push(...flattenWithLevel(item.children, level + 1))
             }
@@ -104,8 +113,8 @@ function NewDocumentPageContent() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!title.trim()) {
-      alert('请输入文档标题')
+    if (!titleEn.trim() || !titleZh.trim()) {
+      alert('请填写中英文文档标题')
       return
     }
 
@@ -116,6 +125,8 @@ function NewDocumentPageContent() {
       return
     }
     
+    const primaryTitle = titleEn.trim() || titleZh.trim()
+
     setSaving(true)
 
     try {
@@ -124,9 +135,13 @@ function NewDocumentPageContent() {
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-          title,
-          slug: generateSlug(title),
-          content,
+          title: titleZh || titleEn,
+          titleEn,
+          titleZh,
+          slug: generateSlug(primaryTitle),
+          content: contentZh || contentEn,
+          contentEn,
+          contentZh,
           published,
           parentId,
           order,
@@ -203,14 +218,24 @@ function NewDocumentPageContent() {
         <div className="max-w-3xl mx-auto space-y-6">
           <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-xl shadow-slate-200/50 dark:shadow-slate-900/50">
             <div className="p-6 space-y-4">
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="输入文档标题..."
-                required
-                className="w-full text-3xl font-semibold text-slate-900 dark:text-slate-100 placeholder-slate-300 dark:placeholder-slate-600 bg-transparent border-none outline-none"
-              />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <input
+                  type="text"
+                  value={titleZh}
+                  onChange={(e) => setTitleZh(e.target.value)}
+                  placeholder="中文标题..."
+                  required
+                  className="w-full text-xl font-semibold text-slate-900 dark:text-slate-100 placeholder-slate-300 dark:placeholder-slate-600 bg-transparent border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+                <input
+                  type="text"
+                  value={titleEn}
+                  onChange={(e) => setTitleEn(e.target.value)}
+                  placeholder="English title..."
+                  required
+                  className="w-full text-xl font-semibold text-slate-900 dark:text-slate-100 placeholder-slate-300 dark:placeholder-slate-600 bg-transparent border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -276,11 +301,24 @@ function NewDocumentPageContent() {
               <h3 className="text-sm font-medium text-slate-900 dark:text-slate-100">内容编辑</h3>
             </div>
             <div className="editor-container p-6">
-              <ByteMDEditor
-                value={content}
-                onChange={setContent}
-                placeholder="开始编写文档内容..."
-              />
+              <div className="space-y-6">
+                <div>
+                  <p className="mb-2 text-sm font-medium text-slate-700 dark:text-slate-300">中文内容</p>
+                  <ByteMDEditor
+                    value={contentZh}
+                    onChange={setContentZh}
+                    placeholder="开始编写中文文档内容..."
+                  />
+                </div>
+                <div>
+                  <p className="mb-2 text-sm font-medium text-slate-700 dark:text-slate-300">English Content</p>
+                  <ByteMDEditor
+                    value={contentEn}
+                    onChange={setContentEn}
+                    placeholder="Start writing English content..."
+                  />
+                </div>
+              </div>
             </div>
           </div>
         </div>

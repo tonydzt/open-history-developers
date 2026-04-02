@@ -22,33 +22,43 @@ model User {
 }
 
 model Category {
-  id          String   @id @default(uuid())
-  name        String   @unique
-  description String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            String   @id @default(uuid())
+  name          String   @unique
+  nameEn        String?
+  nameZh        String?
+  description   String?
+  descriptionEn String?
+  descriptionZh String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   documents Document[]
 }
 
 model Document {
-  id          String   @id @default(uuid())
-  title       String
-  slug        String   @unique
-  content     String
-  excerpt     String?
-  order       Int      @default(0)
-  published   Boolean  @default(false)
-  viewCount   Int      @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        String   @id @default(uuid())
+  title     String
+  titleEn   String?
+  titleZh   String?
+  slug      String   @unique
+  content   String
+  contentEn String?
+  contentZh String?
+  excerpt   String?
+  excerptEn String?
+  excerptZh String?
+  order     Int      @default(0)
+  published Boolean  @default(false)
+  viewCount Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  parentId    String?
-  parent      Document?  @relation("DocumentHierarchy", fields: [parentId], references: [id])
-  children    Document[] @relation("DocumentHierarchy")
+  parentId String?
+  parent   Document?  @relation("DocumentHierarchy", fields: [parentId], references: [id])
+  children Document[] @relation("DocumentHierarchy")
 
-  authorId    String
-  author      User       @relation(fields: [authorId], references: [id])
-  categoryId  String
-  category    Category   @relation(fields: [categoryId], references: [id])
+  authorId   String
+  author     User     @relation(fields: [authorId], references: [id])
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id])
 }

@@ -31,6 +31,8 @@ interface ApiData {
 interface ApiDocument {
   id: string
   title: string
+  titleEn?: string | null
+  titleZh?: string | null
   parentId: string | null
   categoryId: string
   order: number
@@ -62,9 +64,11 @@ export default function EditDocumentPage({ params }: PageProps) {
   const router = useRouter()
   const editorRef = useRef<ByteMDEditorRef>(null)
   const [id, setId] = useState<string>('')
-  const [title, setTitle] = useState('')
+  const [titleEn, setTitleEn] = useState('')
+  const [titleZh, setTitleZh] = useState('')
   const [published, setPublished] = useState(false)
-  const [content, setContent] = useState('')
+  const [contentEn, setContentEn] = useState('')
+  const [contentZh, setContentZh] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [editorReady, setEditorReady] = useState(false)
@@ -112,7 +116,12 @@ export default function EditDocumentPage({ params }: PageProps) {
         const flattenWithLevel = (items: DocumentTreeNode[], level = 0): DocumentOption[] => {
           const result: DocumentOption[] = []
           items.forEach(item => {
-            result.push({ id: item.id, title: item.title, level, categoryId: item.categoryId })
+            result.push({
+              id: item.id,
+              title: item.titleZh || item.titleEn || item.title,
+              level,
+              categoryId: item.categoryId,
+            })
             if (item.children && item.children.length > 0) {
               result.push(...flattenWithLevel(item.children, level + 1))
             }
@@ -132,8 +141,10 @@ export default function EditDocumentPage({ params }: PageProps) {
       const res = await fetch(`/api/documents/${docId}`)
       if (res.ok) {
         const doc = await res.json()
-        setTitle(doc.title)
-        setContent(doc.content)
+        setTitleEn(doc.titleEn || '')
+        setTitleZh(doc.titleZh || doc.title || '')
+        setContentEn(doc.contentEn || '')
+        setContentZh(doc.contentZh || doc.content || '')
         setPublished(doc.published)
         setParentId(doc.parentId)
         setCategoryId(doc.categoryId || '')
@@ -148,6 +159,11 @@ export default function EditDocumentPage({ params }: PageProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (!titleEn.trim() || !titleZh.trim()) {
+      alert('请填写中英文文档标题')
+      return
+    }
 
     const effectiveCategoryId = parentDocument?.categoryId || categoryId
 
@@ -164,8 +180,12 @@ export default function EditDocumentPage({ params }: PageProps) {
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-          title,
-          content,
+          title: titleZh || titleEn,
+          titleEn,
+          titleZh,
+          content: contentZh || contentEn,
+          contentEn,
+          contentZh,
           published,
           parentId,
           order,
@@ -283,7 +303,7 @@ export default function EditDocumentPage({ params }: PageProps) {
     if (editorRef.current) {
       editorRef.current.insertText('\n' + markdown)
     } else {
-      setContent(prev => prev + '\n' + markdown)
+      setContentZh((prev) => prev + '\n' + markdown)
     }
     setShowApiModal(false)
     setApiData(defaultApiData)
@@ -350,11 +370,19 @@ export default function EditDocumentPage({ params }: PageProps) {
             <div className="p-6 space-y-4">
               <input
                 type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="输入文档标题..."
+                value={titleZh}
+                onChange={(e) => setTitleZh(e.target.value)}
+                placeholder="中文标题..."
                 required
-                className="w-full text-3xl font-semibold text-slate-900 dark:text-slate-100 placeholder-slate-300 dark:placeholder-slate-600 bg-transparent border-none outline-none"
+                className="w-full text-xl font-semibold text-slate-900 dark:text-slate-100 placeholder-slate-300 dark:placeholder-slate-600 bg-transparent border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+              <input
+                type="text"
+                value={titleEn}
+                onChange={(e) => setTitleEn(e.target.value)}
+                placeholder="English title..."
+                required
+                className="w-full text-xl font-semibold text-slate-900 dark:text-slate-100 placeholder-slate-300 dark:placeholder-slate-600 bg-transparent border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500"
               />
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -434,12 +462,25 @@ export default function EditDocumentPage({ params }: PageProps) {
             </div>
             <div className="editor-container">
               {editorReady && (
-                <ByteMDEditor
-                  ref={editorRef}
-                  value={content}
-                  onChange={setContent}
-                  placeholder="开始编写文档内容..."
-                />
+                <div className="space-y-6">
+                  <div>
+                    <p className="mb-2 text-sm font-medium text-slate-700 dark:text-slate-300">中文内容</p>
+                    <ByteMDEditor
+                      ref={editorRef}
+                      value={contentZh}
+                      onChange={setContentZh}
+                      placeholder="开始编写中文文档内容..."
+                    />
+                  </div>
+                  <div>
+                    <p className="mb-2 text-sm font-medium text-slate-700 dark:text-slate-300">English Content</p>
+                    <ByteMDEditor
+                      value={contentEn}
+                      onChange={setContentEn}
+                      placeholder="Start writing English content..."
+                    />
+                  </div>
+                </div>
               )}
             </div>
           </div>

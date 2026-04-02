@@ -2,10 +2,15 @@
 
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
-import { ChevronDown, FileText, Menu, X } from 'lucide-react'
+import { ChevronDown, Languages, Menu, X } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { useEffect, useRef, useState } from 'react'
 import UserMenu from '@/components/UserMenu'
+import {
+  LOCALE_COOKIE_NAME,
+  type Locale,
+  type Messages,
+} from '@/lib/i18n'
 
 export interface NavbarCategoryGroup {
   categoryId: string
@@ -15,16 +20,23 @@ export interface NavbarCategoryGroup {
 
 interface GlobalNavbarClientProps {
   categoryGroups: NavbarCategoryGroup[]
+  locale: Locale
+  labels: Messages[Locale]
 }
 
-export default function GlobalNavbarClient({ categoryGroups }: GlobalNavbarClientProps) {
+export default function GlobalNavbarClient({ categoryGroups, locale, labels }: GlobalNavbarClientProps) {
   const { data: session, status } = useSession()
   const [desktopOpenCategory, setDesktopOpenCategory] = useState<string | null>(null)
   const [desktopMenuStyle, setDesktopMenuStyle] = useState<{ top: number; left: number }>({ top: 0, left: 0 })
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [mobileOpenCategory, setMobileOpenCategory] = useState<string | null>(null)
+  const [localeMenuOpen, setLocaleMenuOpen] = useState(false)
+  const [localeMenuStyle, setLocaleMenuStyle] = useState<{ top: number; left: number }>({ top: 0, left: 0 })
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const localeCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const triggerRefs = useRef<Record<string, HTMLDivElement | null>>({})
+  const localeTriggerRef = useRef<HTMLDivElement>(null)
+  const localeMenuRef = useRef<HTMLDivElement>(null)
   const canUseDOM = typeof document !== 'undefined'
   const hasCategoryGroups = categoryGroups.length > 0
 
@@ -32,6 +44,13 @@ export default function GlobalNavbarClient({ categoryGroups }: GlobalNavbarClien
     if (closeTimerRef.current) {
       clearTimeout(closeTimerRef.current)
       closeTimerRef.current = null
+    }
+  }
+
+  const clearLocaleCloseTimer = () => {
+    if (localeCloseTimerRef.current) {
+      clearTimeout(localeCloseTimerRef.current)
+      localeCloseTimerRef.current = null
     }
   }
 
@@ -62,6 +81,29 @@ export default function GlobalNavbarClient({ categoryGroups }: GlobalNavbarClien
     setMobileOpenCategory((prev) => (prev === categoryId ? null : categoryId))
   }
 
+  const handleLocaleEnter = () => {
+    clearLocaleCloseTimer()
+    if (canUseDOM) {
+      const trigger = localeTriggerRef.current
+      if (trigger) {
+        const rect = trigger.getBoundingClientRect()
+        const menuWidth = 160
+        const viewportWidth = window.innerWidth
+        const left = Math.min(Math.max(8, rect.right - menuWidth), viewportWidth - menuWidth - 8)
+        const top = rect.bottom + 8
+        setLocaleMenuStyle({ top, left })
+      }
+    }
+    setLocaleMenuOpen(true)
+  }
+
+  const handleLocaleLeave = () => {
+    clearLocaleCloseTimer()
+    localeCloseTimerRef.current = setTimeout(() => {
+      setLocaleMenuOpen(false)
+    }, 120)
+  }
+
   useEffect(() => {
     if (!desktopOpenCategory || !canUseDOM) return
 
@@ -86,6 +128,54 @@ export default function GlobalNavbarClient({ categoryGroups }: GlobalNavbarClien
     }
   }, [desktopOpenCategory, canUseDOM])
 
+  useEffect(() => {
+    if (!localeMenuOpen || !canUseDOM) return
+
+    const updatePosition = () => {
+      const trigger = localeTriggerRef.current
+      if (!trigger) return
+      const rect = trigger.getBoundingClientRect()
+      const menuWidth = 160
+      const viewportWidth = window.innerWidth
+      const left = Math.min(Math.max(8, rect.right - menuWidth), viewportWidth - menuWidth - 8)
+      const top = rect.bottom + 8
+      setLocaleMenuStyle({ top, left })
+    }
+
+    updatePosition()
+    window.addEventListener('resize', updatePosition)
+    window.addEventListener('scroll', updatePosition, true)
+
+    return () => {
+      window.removeEventListener('resize', updatePosition)
+      window.removeEventListener('scroll', updatePosition, true)
+    }
+  }, [localeMenuOpen, canUseDOM])
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node
+      const clickedTrigger = localeTriggerRef.current?.contains(target)
+      const clickedMenu = localeMenuRef.current?.contains(target)
+      if (!clickedTrigger && !clickedMenu) {
+        setLocaleMenuOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  const handleLocaleChange = (nextLocale: Locale) => {
+    if (nextLocale === locale) {
+      setLocaleMenuOpen(false)
+      return
+    }
+
+    document.cookie = `${LOCALE_COOKIE_NAME}=${nextLocale}; path=/; max-age=31536000; samesite=lax`
+    window.location.reload()
+  }
+
   const desktopOpenGroup = desktopOpenCategory
     ? categoryGroups.find((group) => group.categoryId === desktopOpenCategory) || null
     : null
@@ -95,10 +185,12 @@ export default function GlobalNavbarClient({ categoryGroups }: GlobalNavbarClien
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="h-14 flex items-center justify-between gap-3">
           <Link href="/" className="flex items-center gap-2 shrink-0">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center">
-              <FileText className="w-4 h-4 text-white" />
-            </div>
-            <span className="font-semibold text-slate-900 dark:text-white">文档开放平台</span>
+            <img
+              src="https://test.vineoftime.com/img/logo/vineoftime.png"
+              alt="Vine of Time Logo"
+              className="w-8 h-8 object-contain"
+            />
+            <span className="font-semibold text-slate-900 dark:text-white">{labels.common.siteTitle}</span>
           </Link>
 
           <nav className="hidden md:flex items-center gap-2 flex-1 min-w-0">
@@ -125,12 +217,29 @@ export default function GlobalNavbarClient({ categoryGroups }: GlobalNavbarClien
           </nav>
 
           <div className="flex items-center gap-2 shrink-0">
+            <div
+              className="relative"
+              ref={localeTriggerRef}
+              onMouseEnter={handleLocaleEnter}
+              onMouseLeave={handleLocaleLeave}
+            >
+              <button
+                type="button"
+                className="px-3 py-2 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800 transition-colors inline-flex items-center gap-1.5 border border-transparent hover:border-slate-200 dark:hover:border-slate-700"
+                aria-label={labels.common.language}
+              >
+                <Languages className="w-4 h-4" />
+                <span className="text-sm font-medium">{locale === 'zh' ? labels.common.languageChinese : labels.common.languageEnglish}</span>
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${localeMenuOpen ? 'rotate-180' : ''}`} />
+              </button>
+            </div>
+
             {hasCategoryGroups && (
               <button
                 type="button"
                 onClick={() => setMobileMenuOpen((prev) => !prev)}
                 className="md:hidden p-2 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800 transition-colors"
-                aria-label={mobileMenuOpen ? '关闭导航菜单' : '打开导航菜单'}
+                aria-label={mobileMenuOpen ? labels.navbar.closeNavMenu : labels.navbar.openNavMenu}
               >
                 {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
               </button>
@@ -141,10 +250,10 @@ export default function GlobalNavbarClient({ categoryGroups }: GlobalNavbarClien
                 href="/login"
                 className="text-sm px-3 py-1.5 rounded-lg bg-slate-900 text-white hover:bg-slate-700 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white transition-colors"
               >
-                登录
+                {labels.navbar.signIn}
               </Link>
             )}
-            <UserMenu />
+            <UserMenu locale={locale} />
           </div>
         </div>
 
@@ -181,6 +290,42 @@ export default function GlobalNavbarClient({ categoryGroups }: GlobalNavbarClien
           </div>
         )}
       </div>
+
+      {canUseDOM &&
+        localeMenuOpen &&
+        createPortal(
+          <div
+            ref={localeMenuRef}
+            style={{ top: localeMenuStyle.top, left: localeMenuStyle.left }}
+            className="fixed w-40 rounded-xl border border-slate-200/80 dark:border-slate-700/80 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md shadow-2xl shadow-slate-900/10 dark:shadow-black/30 py-1 z-[2147483647]"
+            onMouseEnter={handleLocaleEnter}
+            onMouseLeave={handleLocaleLeave}
+          >
+            <button
+              type="button"
+              onClick={() => handleLocaleChange('en')}
+              className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors ${
+                locale === 'en'
+                  ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/30'
+                  : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+              }`}
+            >
+              {labels.common.languageEnglish}
+            </button>
+            <button
+              type="button"
+              onClick={() => handleLocaleChange('zh')}
+              className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors ${
+                locale === 'zh'
+                  ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/30'
+                  : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+              }`}
+            >
+              {labels.common.languageChinese}
+            </button>
+          </div>,
+          document.body
+        )}
 
       {canUseDOM &&
         desktopOpenGroup &&

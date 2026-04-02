@@ -117,13 +117,17 @@ async function main() {
           create: {
             id: category.id,
             name: category.name,
+            nameZh: category.name,
             description: category.description,
+            descriptionZh: category.description,
             createdAt: toDate(category.createdAt),
             updatedAt: toDate(category.updatedAt),
           },
           update: {
             name: category.name,
+            nameZh: category.name,
             description: category.description,
+            descriptionZh: category.description,
             createdAt: toDate(category.createdAt),
             updatedAt: toDate(category.updatedAt),
           },
@@ -136,7 +140,9 @@ async function main() {
           create: {
             id: uncategorizedCategoryId,
             name: 'Uncategorized',
+            nameEn: 'Uncategorized',
             description: 'Auto-created during SQLite to PostgreSQL migration',
+            descriptionEn: 'Auto-created during SQLite to PostgreSQL migration',
           },
           update: {},
         })
@@ -159,9 +165,12 @@ async function main() {
             create: {
               id: doc.id,
               title: doc.title,
+              titleZh: doc.title,
               slug: doc.slug,
               content: doc.content,
+              contentZh: doc.content,
               excerpt: doc.excerpt,
+              excerptZh: doc.excerpt,
               order: doc.order ?? 0,
               published: Boolean(doc.published),
               viewCount: doc.viewCount,
@@ -173,9 +182,12 @@ async function main() {
             },
             update: {
               title: doc.title,
+              titleZh: doc.title,
               slug: doc.slug,
               content: doc.content,
+              contentZh: doc.content,
               excerpt: doc.excerpt,
+              excerptZh: doc.excerpt,
               order: doc.order ?? 0,
               published: Boolean(doc.published),
               viewCount: doc.viewCount,

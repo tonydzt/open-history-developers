@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { openApiAuth } from '@/lib/open-api-auth'
 import { getDescendantIds, getTopLevelCategoryId, syncSubtreeCategory } from '@/lib/document-category'
+import { getLocaleFromRequest } from '@/lib/i18n-server'
+import { localizeCategory, localizeDocument, resolveLocalizedDocumentInput } from '@/lib/content-i18n'
 
 /**
  * GET /api/open/documents/:id - 获取单个文档详情
@@ -14,22 +16,23 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   }
 
   try {
+    const locale = getLocaleFromRequest(request)
     const { id } = await params
 
     const document = await prisma.document.findUnique({
       where: { id },
       include: {
         category: {
-          select: { id: true, name: true, description: true },
+          select: { id: true, name: true, nameEn: true, nameZh: true, description: true, descriptionEn: true, descriptionZh: true },
         },
         author: {
           select: { id: true, name: true, email: true },
         },
         parent: {
-          select: { id: true, title: true, slug: true },
+          select: { id: true, title: true, titleEn: true, titleZh: true, slug: true },
         },
         children: {
-          select: { id: true, title: true, slug: true, order: true },
+          select: { id: true, title: true, titleEn: true, titleZh: true, slug: true, order: true },
         },
       },
     })
@@ -44,7 +47,17 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       data: { viewCount: { increment: 1 } },
     })
 
-    return NextResponse.json(document)
+    return NextResponse.json(
+      localizeDocument(
+        {
+          ...document,
+          category: document.category ? localizeCategory(document.category, locale) : null,
+          parent: document.parent ? localizeDocument(document.parent, locale) : null,
+          children: document.children.map((child) => localizeDocument(child, locale)),
+        },
+        locale
+      )
+    )
   } catch (error) {
     console.error('Fetch document error:', error)
     return NextResponse.json({ error: 'Failed to fetch document' }, { status: 500 })
@@ -71,7 +84,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'Document not found' }, { status: 404 })
     }
 
-    const { title, slug, content, excerpt, order, published, parentId, categoryId } = body
+    const { slug, order, published, parentId, categoryId } = body
+    const localized = resolveLocalizedDocumentInput(body)
     const nextParentId = parentId === undefined ? existingDoc.parentId : parentId || null
     let resolvedCategoryId = existingDoc.categoryId
 
@@ -113,10 +127,16 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       const updatedDocument = await tx.document.update({
         where: { id },
         data: {
-          ...(title !== undefined && { title }),
+          ...(localized.title !== null && { title: localized.title! }),
+          ...(localized.titleEn !== null && { titleEn: localized.titleEn }),
+          ...(localized.titleZh !== null && { titleZh: localized.titleZh }),
           ...(slug !== undefined && { slug }),
-          ...(content !== undefined && { content }),
-          ...(excerpt !== undefined && { excerpt }),
+          ...(body.content !== undefined && { content: localized.content }),
+          ...(body.contentEn !== undefined && { contentEn: localized.contentEn }),
+          ...(body.contentZh !== undefined && { contentZh: localized.contentZh }),
+          ...(body.excerpt !== undefined && { excerpt: localized.excerpt }),
+          ...(body.excerptEn !== undefined && { excerptEn: localized.excerptEn }),
+          ...(body.excerptZh !== undefined && { excerptZh: localized.excerptZh }),
           ...(order !== undefined && { order }),
           ...(published !== undefined && { published }),
           ...(parentId !== undefined && { parentId: nextParentId }),

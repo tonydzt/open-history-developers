@@ -9,7 +9,11 @@ import { useToast } from '@/components/ui/ToastProvider'
 interface CategoryItem {
   id: string
   name: string
+  nameEn: string | null
+  nameZh: string | null
   description: string | null
+  descriptionEn: string | null
+  descriptionZh: string | null
   createdAt: string
   updatedAt: string
   _count: {
@@ -18,13 +22,17 @@ interface CategoryItem {
 }
 
 interface CategoryFormState {
-  name: string
-  description: string
+  nameEn: string
+  nameZh: string
+  descriptionEn: string
+  descriptionZh: string
 }
 
 const emptyForm: CategoryFormState = {
-  name: '',
-  description: '',
+  nameEn: '',
+  nameZh: '',
+  descriptionEn: '',
+  descriptionZh: '',
 }
 
 function CategoryModal({
@@ -62,12 +70,12 @@ function CategoryModal({
           <div className="px-6 py-5 space-y-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-2">
-                分类名称
+                分类名称（中文）
               </label>
               <input
                 type="text"
-                value={formData.name}
-                onChange={(event) => onChange({ ...formData, name: event.target.value })}
+                value={formData.nameZh}
+                onChange={(event) => onChange({ ...formData, nameZh: event.target.value })}
                 placeholder="例如：OpenAPI 指南"
                 className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 maxLength={50}
@@ -77,11 +85,26 @@ function CategoryModal({
 
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-2">
-                分类描述
+                Category Name (English)
+              </label>
+              <input
+                type="text"
+                value={formData.nameEn}
+                onChange={(event) => onChange({ ...formData, nameEn: event.target.value })}
+                placeholder="e.g. OpenAPI Guides"
+                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                maxLength={50}
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-2">
+                分类描述（中文）
               </label>
               <textarea
-                value={formData.description}
-                onChange={(event) => onChange({ ...formData, description: event.target.value })}
+                value={formData.descriptionZh}
+                onChange={(event) => onChange({ ...formData, descriptionZh: event.target.value })}
                 placeholder="可选，简要描述分类用途"
                 className="w-full min-h-28 px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-y"
                 maxLength={200}
@@ -178,8 +201,10 @@ export default function AdminCategoriesPageClient() {
   const openEditModal = (category: CategoryItem) => {
     setEditingCategory(category)
     setFormData({
-      name: category.name,
-      description: category.description || '',
+      nameEn: category.nameEn || '',
+      nameZh: category.nameZh || category.name || '',
+      descriptionEn: category.descriptionEn || '',
+      descriptionZh: category.descriptionZh || category.description || '',
     })
   }
 
@@ -187,12 +212,14 @@ export default function AdminCategoriesPageClient() {
     event.preventDefault()
 
     const payload = {
-      name: formData.name.trim(),
-      description: formData.description.trim(),
+      nameEn: formData.nameEn.trim(),
+      nameZh: formData.nameZh.trim(),
+      descriptionEn: formData.descriptionEn.trim(),
+      descriptionZh: formData.descriptionZh.trim(),
     }
 
-    if (!payload.name) {
-      toast('请输入分类名称', 'error')
+    if (!payload.nameEn || !payload.nameZh) {
+      toast('请填写中英文分类名称', 'error')
       return
     }
 
