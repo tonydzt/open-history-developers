@@ -207,6 +207,20 @@ body {
   background: #27272a;
 }
 
+@media (max-width: 767px) {
+  .prose table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .prose th,
+  .prose td {
+    white-space: nowrap;
+  }
+}
+
 .prose th {
   background: #f4f4f5;
   color: #18181b;
