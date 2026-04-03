@@ -1,7 +1,6 @@
 'use client'
 
 import Link from 'next/link'
-import { useSession } from 'next-auth/react'
 import { ChevronDown, Languages, Menu, X } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { useEffect, useRef, useState } from 'react'
@@ -27,7 +26,6 @@ interface GlobalNavbarClientProps {
 export default function GlobalNavbarClient({ categoryGroups, locale, labels }: GlobalNavbarClientProps) {
   const desktopMenuWidth = 224
   const localeMenuWidth = 112
-  const { data: session, status } = useSession()
   const [desktopOpenCategory, setDesktopOpenCategory] = useState<string | null>(null)
   const [desktopMenuStyle, setDesktopMenuStyle] = useState<{ top: number; left: number }>({ top: 0, left: 0 })
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -246,14 +244,6 @@ export default function GlobalNavbarClient({ categoryGroups, locale, labels }: G
               </button>
             )}
 
-            {status !== 'loading' && !session && (
-              <Link
-                href="/login"
-                className="text-xs sm:text-sm px-2 sm:px-3 py-1.5 rounded-lg bg-slate-900 text-white hover:bg-slate-700 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white transition-colors whitespace-nowrap"
-              >
-                {labels.navbar.signIn}
-              </Link>
-            )}
             <UserMenu locale={locale} />
           </div>
         </div>
