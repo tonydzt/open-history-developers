@@ -16,10 +16,12 @@ export function normalizeLocale(input?: string | null): Locale {
 export const messages = {
   en: {
     common: {
-      siteTitle: 'Vine of Time Open Platform',
+      siteTitle: 'VOT Open',
       language: 'Language',
       languageEnglish: 'English',
       languageChinese: 'Chinese',
+      languageEnglishShort: 'EN',
+      languageChineseShort: '中',
       close: 'Close',
       open: 'Open',
     },
@@ -40,10 +42,12 @@ export const messages = {
   },
   zh: {
     common: {
-      siteTitle: 'Vine of Time 开放平台',
+      siteTitle: 'VOT 开放',
       language: '语言',
       languageEnglish: 'English',
       languageChinese: '中文',
+      languageEnglishShort: 'EN',
+      languageChineseShort: '中',
       close: '关闭',
       open: '打开',
     },

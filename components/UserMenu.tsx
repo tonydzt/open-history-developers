@@ -154,7 +154,7 @@ export default function UserMenu({ locale = 'en' }: { locale?: Locale }) {
   return (
     <div className="relative" ref={triggerRef} onMouseEnter={openMenu} onMouseLeave={closeMenu}>
       <button
-        className={`flex items-center gap-2 px-3 py-2 rounded-xl border transition-colors ${
+        className={`flex items-center gap-2 px-2 sm:px-3 py-2 rounded-xl border transition-colors shrink-0 ${
           isOpen
             ? 'bg-slate-100 border-slate-200 text-slate-900 dark:bg-slate-800 dark:border-slate-700 dark:text-white'
             : 'border-transparent hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200'
