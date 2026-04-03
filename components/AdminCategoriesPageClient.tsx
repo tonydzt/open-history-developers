@@ -35,6 +35,27 @@ const emptyForm: CategoryFormState = {
   descriptionZh: '',
 }
 
+const LOCALE_TABS = [
+  {
+    code: 'zh',
+    label: '中文',
+    nameLabel: '分类名称',
+    namePlaceholder: '例如：OpenAPI 指南',
+    descriptionLabel: '分类描述',
+    descriptionPlaceholder: '可选，简要描述分类用途',
+  },
+  {
+    code: 'en',
+    label: 'English',
+    nameLabel: 'Category Name',
+    namePlaceholder: 'e.g. OpenAPI Guides',
+    descriptionLabel: 'Category Description',
+    descriptionPlaceholder: 'Optional, describe this category briefly',
+  },
+] as const
+
+type LocaleCode = (typeof LOCALE_TABS)[number]['code']
+
 function CategoryModal({
   title,
   saving,
@@ -50,6 +71,11 @@ function CategoryModal({
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void
   onChange: (next: CategoryFormState) => void
 }) {
+  const [activeLocale, setActiveLocale] = useState<LocaleCode>('zh')
+  const activeTab = LOCALE_TABS.find((tab) => tab.code === activeLocale) || LOCALE_TABS[0]
+  const activeName = activeLocale === 'zh' ? formData.nameZh : formData.nameEn
+  const activeDescription = activeLocale === 'zh' ? formData.descriptionZh : formData.descriptionEn
+
   return (
     <div
       className="fixed inset-0 z-[1200] bg-black/45 backdrop-blur-sm flex items-center justify-center p-4"
@@ -68,15 +94,39 @@ function CategoryModal({
           </div>
 
           <div className="px-6 py-5 space-y-4">
+            <div className="inline-flex items-center rounded-xl bg-slate-100 dark:bg-slate-800 p-1">
+              {LOCALE_TABS.map((tab) => (
+                <button
+                  key={tab.code}
+                  type="button"
+                  onClick={() => setActiveLocale(tab.code)}
+                  className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
+                    activeLocale === tab.code
+                      ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-2">
-                分类名称（中文）
+                {activeTab.nameLabel}
               </label>
               <input
                 type="text"
-                value={formData.nameZh}
-                onChange={(event) => onChange({ ...formData, nameZh: event.target.value })}
-                placeholder="例如：OpenAPI 指南"
+                value={activeName}
+                onChange={(event) => {
+                  const value = event.target.value
+                  if (activeLocale === 'zh') {
+                    onChange({ ...formData, nameZh: value })
+                    return
+                  }
+                  onChange({ ...formData, nameEn: value })
+                }}
+                placeholder={activeTab.namePlaceholder}
                 className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 maxLength={50}
                 required
@@ -85,27 +135,19 @@ function CategoryModal({
 
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-2">
-                Category Name (English)
-              </label>
-              <input
-                type="text"
-                value={formData.nameEn}
-                onChange={(event) => onChange({ ...formData, nameEn: event.target.value })}
-                placeholder="e.g. OpenAPI Guides"
-                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                maxLength={50}
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-2">
-                分类描述（中文）
+                {activeTab.descriptionLabel}
               </label>
               <textarea
-                value={formData.descriptionZh}
-                onChange={(event) => onChange({ ...formData, descriptionZh: event.target.value })}
-                placeholder="可选，简要描述分类用途"
+                value={activeDescription}
+                onChange={(event) => {
+                  const value = event.target.value
+                  if (activeLocale === 'zh') {
+                    onChange({ ...formData, descriptionZh: value })
+                    return
+                  }
+                  onChange({ ...formData, descriptionEn: value })
+                }}
+                placeholder={activeTab.descriptionPlaceholder}
                 className="w-full min-h-28 px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-y"
                 maxLength={200}
               />

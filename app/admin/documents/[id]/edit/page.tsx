@@ -49,6 +49,25 @@ interface DocumentOption {
   categoryId: string
 }
 
+const LOCALE_TABS = [
+  {
+    code: 'zh',
+    label: '中文',
+    titlePlaceholder: '中文标题...',
+    contentLabel: '中文内容',
+    contentPlaceholder: '开始编写中文文档内容...',
+  },
+  {
+    code: 'en',
+    label: 'English',
+    titlePlaceholder: 'English title...',
+    contentLabel: 'English Content',
+    contentPlaceholder: 'Start writing English content...',
+  },
+] as const
+
+type LocaleCode = (typeof LOCALE_TABS)[number]['code']
+
 const defaultApiData: ApiData = {
   name: '',
   description: '',
@@ -80,6 +99,7 @@ export default function EditDocumentPage({ params }: PageProps) {
   const [documents, setDocuments] = useState<DocumentOption[]>([])
   const [rawDocuments, setRawDocuments] = useState<ApiDocument[]>([])
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([])
+  const [activeLocale, setActiveLocale] = useState<LocaleCode>('zh')
 
   async function fetchCategories() {
     try {
@@ -236,6 +256,9 @@ export default function EditDocumentPage({ params }: PageProps) {
   const parentDocument = parentId ? documents.find((document) => document.id === parentId) : null
   const isChildDocument = Boolean(parentId)
   const effectiveCategoryId = parentDocument?.categoryId || categoryId
+  const activeTab = LOCALE_TABS.find((tab) => tab.code === activeLocale) || LOCALE_TABS[0]
+  const activeTitle = activeLocale === 'zh' ? titleZh : titleEn
+  const activeContent = activeLocale === 'zh' ? contentZh : contentEn
 
   const addParam = (type: 'params' | 'headers') => {
     setApiData(prev => ({
@@ -303,7 +326,11 @@ export default function EditDocumentPage({ params }: PageProps) {
     if (editorRef.current) {
       editorRef.current.insertText('\n' + markdown)
     } else {
-      setContentZh((prev) => prev + '\n' + markdown)
+      if (activeLocale === 'zh') {
+        setContentZh((prev) => prev + '\n' + markdown)
+      } else {
+        setContentEn((prev) => prev + '\n' + markdown)
+      }
     }
     setShowApiModal(false)
     setApiData(defaultApiData)
@@ -368,19 +395,35 @@ export default function EditDocumentPage({ params }: PageProps) {
         <div className="max-w-3xl mx-auto space-y-6">
           <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-xl shadow-slate-200/50 dark:shadow-slate-900/50">
             <div className="p-6 space-y-4">
+              <div className="inline-flex items-center rounded-xl bg-slate-100 dark:bg-slate-800 p-1">
+                {LOCALE_TABS.map((tab) => (
+                  <button
+                    key={tab.code}
+                    type="button"
+                    onClick={() => setActiveLocale(tab.code)}
+                    className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
+                      activeLocale === tab.code
+                        ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm'
+                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
               <input
                 type="text"
-                value={titleZh}
-                onChange={(e) => setTitleZh(e.target.value)}
-                placeholder="中文标题..."
-                required
-                className="w-full text-xl font-semibold text-slate-900 dark:text-slate-100 placeholder-slate-300 dark:placeholder-slate-600 bg-transparent border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-              <input
-                type="text"
-                value={titleEn}
-                onChange={(e) => setTitleEn(e.target.value)}
-                placeholder="English title..."
+                value={activeTitle}
+                onChange={(e) => {
+                  const value = e.target.value
+                  if (activeLocale === 'zh') {
+                    setTitleZh(value)
+                    return
+                  }
+                  setTitleEn(value)
+                }}
+                placeholder={activeTab.titlePlaceholder}
                 required
                 className="w-full text-xl font-semibold text-slate-900 dark:text-slate-100 placeholder-slate-300 dark:placeholder-slate-600 bg-transparent border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500"
               />
@@ -447,39 +490,54 @@ export default function EditDocumentPage({ params }: PageProps) {
           <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-xl shadow-slate-200/50 dark:shadow-slate-900/50">
             <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
               <h3 className="text-sm font-medium text-slate-900 dark:text-slate-100">内容编辑</h3>
-              <button
-                onClick={() => {
-                  if (editorRef.current) {
-                    editorRef.current.saveCursor()
-                  }
-                  setShowApiModal(true)
-                }}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-indigo-600 dark:text-indigo-400 bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/30 dark:to-purple-900/30 rounded-lg hover:from-indigo-100 hover:to-purple-100 dark:hover:from-indigo-900/50 dark:hover:to-purple-900/50 transition-all"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                插入 API 文档
-              </button>
+              <div className="flex items-center gap-2">
+                <div className="inline-flex items-center rounded-xl bg-slate-100 dark:bg-slate-800 p-1">
+                  {LOCALE_TABS.map((tab) => (
+                    <button
+                      key={tab.code}
+                      type="button"
+                      onClick={() => setActiveLocale(tab.code)}
+                      className={`px-3 py-1 text-xs rounded-lg transition-colors ${
+                        activeLocale === tab.code
+                          ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm'
+                          : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  onClick={() => {
+                    if (editorRef.current) {
+                      editorRef.current.saveCursor()
+                    }
+                    setShowApiModal(true)
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-indigo-600 dark:text-indigo-400 bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/30 dark:to-purple-900/30 rounded-lg hover:from-indigo-100 hover:to-purple-100 dark:hover:from-indigo-900/50 dark:hover:to-purple-900/50 transition-all"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  插入 API 文档
+                </button>
+              </div>
             </div>
             <div className="editor-container">
               {editorReady && (
-                <div className="space-y-6">
-                  <div>
-                    <p className="mb-2 text-sm font-medium text-slate-700 dark:text-slate-300">中文内容</p>
-                    <ByteMDEditor
-                      ref={editorRef}
-                      value={contentZh}
-                      onChange={setContentZh}
-                      placeholder="开始编写中文文档内容..."
-                    />
-                  </div>
-                  <div>
-                    <p className="mb-2 text-sm font-medium text-slate-700 dark:text-slate-300">English Content</p>
-                    <ByteMDEditor
-                      value={contentEn}
-                      onChange={setContentEn}
-                      placeholder="Start writing English content..."
-                    />
-                  </div>
+                <div>
+                  <p className="mb-2 text-sm font-medium text-slate-700 dark:text-slate-300">{activeTab.contentLabel}</p>
+                  <ByteMDEditor
+                    key={activeLocale}
+                    ref={editorRef}
+                    value={activeContent}
+                    onChange={(value) => {
+                      if (activeLocale === 'zh') {
+                        setContentZh(value)
+                        return
+                      }
+                      setContentEn(value)
+                    }}
+                    placeholder={activeTab.contentPlaceholder}
+                  />
                 </div>
               )}
             </div>

@@ -28,6 +28,25 @@ interface DocumentOption {
   categoryId: string
 }
 
+const LOCALE_TABS = [
+  {
+    code: 'zh',
+    label: '中文',
+    titlePlaceholder: '中文标题...',
+    contentLabel: '中文内容',
+    contentPlaceholder: '开始编写中文文档内容...',
+  },
+  {
+    code: 'en',
+    label: 'English',
+    titlePlaceholder: 'English title...',
+    contentLabel: 'English Content',
+    contentPlaceholder: 'Start writing English content...',
+  },
+] as const
+
+type LocaleCode = (typeof LOCALE_TABS)[number]['code']
+
 function NewDocumentPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -43,6 +62,7 @@ function NewDocumentPageContent() {
   const [categoryId, setCategoryId] = useState('')
   const [parentId, setParentId] = useState<string | null>(requestedParentId)
   const [order, setOrder] = useState(0)
+  const [activeLocale, setActiveLocale] = useState<LocaleCode>('zh')
 
   async function fetchCategories() {
     try {
@@ -171,6 +191,9 @@ function NewDocumentPageContent() {
   const parentDocument = parentId ? documents.find((document) => document.id === parentId) : null
   const isChildDocument = Boolean(parentId)
   const effectiveCategoryId = parentDocument?.categoryId || categoryId
+  const activeTab = LOCALE_TABS.find((tab) => tab.code === activeLocale) || LOCALE_TABS[0]
+  const activeTitle = activeLocale === 'zh' ? titleZh : titleEn
+  const activeContent = activeLocale === 'zh' ? contentZh : contentEn
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50/30 dark:from-slate-950 dark:via-slate-900 dark:to-indigo-950/30">
@@ -218,20 +241,36 @@ function NewDocumentPageContent() {
         <div className="max-w-3xl mx-auto space-y-6">
           <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-xl shadow-slate-200/50 dark:shadow-slate-900/50">
             <div className="p-6 space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="inline-flex items-center rounded-xl bg-slate-100 dark:bg-slate-800 p-1">
+                {LOCALE_TABS.map((tab) => (
+                  <button
+                    key={tab.code}
+                    type="button"
+                    onClick={() => setActiveLocale(tab.code)}
+                    className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
+                      activeLocale === tab.code
+                        ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm'
+                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              <div>
                 <input
                   type="text"
-                  value={titleZh}
-                  onChange={(e) => setTitleZh(e.target.value)}
-                  placeholder="中文标题..."
-                  required
-                  className="w-full text-xl font-semibold text-slate-900 dark:text-slate-100 placeholder-slate-300 dark:placeholder-slate-600 bg-transparent border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-                <input
-                  type="text"
-                  value={titleEn}
-                  onChange={(e) => setTitleEn(e.target.value)}
-                  placeholder="English title..."
+                  value={activeTitle}
+                  onChange={(e) => {
+                    const value = e.target.value
+                    if (activeLocale === 'zh') {
+                      setTitleZh(value)
+                      return
+                    }
+                    setTitleEn(value)
+                  }}
+                  placeholder={activeTab.titlePlaceholder}
                   required
                   className="w-full text-xl font-semibold text-slate-900 dark:text-slate-100 placeholder-slate-300 dark:placeholder-slate-600 bg-transparent border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500"
                 />
@@ -297,27 +336,39 @@ function NewDocumentPageContent() {
           </div>
 
           <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-xl shadow-slate-200/50 dark:shadow-slate-900/50">
-            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800">
+            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3">
               <h3 className="text-sm font-medium text-slate-900 dark:text-slate-100">内容编辑</h3>
+              <div className="inline-flex items-center rounded-xl bg-slate-100 dark:bg-slate-800 p-1">
+                {LOCALE_TABS.map((tab) => (
+                  <button
+                    key={tab.code}
+                    type="button"
+                    onClick={() => setActiveLocale(tab.code)}
+                    className={`px-3 py-1 text-xs rounded-lg transition-colors ${
+                      activeLocale === tab.code
+                        ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm'
+                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
             </div>
             <div className="editor-container p-6">
-              <div className="space-y-6">
-                <div>
-                  <p className="mb-2 text-sm font-medium text-slate-700 dark:text-slate-300">中文内容</p>
-                  <ByteMDEditor
-                    value={contentZh}
-                    onChange={setContentZh}
-                    placeholder="开始编写中文文档内容..."
-                  />
-                </div>
-                <div>
-                  <p className="mb-2 text-sm font-medium text-slate-700 dark:text-slate-300">English Content</p>
-                  <ByteMDEditor
-                    value={contentEn}
-                    onChange={setContentEn}
-                    placeholder="Start writing English content..."
-                  />
-                </div>
+              <div>
+                <p className="mb-2 text-sm font-medium text-slate-700 dark:text-slate-300">{activeTab.contentLabel}</p>
+                <ByteMDEditor
+                  value={activeContent}
+                  onChange={(value) => {
+                    if (activeLocale === 'zh') {
+                      setContentZh(value)
+                      return
+                    }
+                    setContentEn(value)
+                  }}
+                  placeholder={activeTab.contentPlaceholder}
+                />
               </div>
             </div>
           </div>
