@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { ArrowLeft, Calendar, User, Eye, ChevronRight, FileText, ChevronDown, PanelLeftClose, PanelRightClose, PanelLeft, PanelRight } from 'lucide-react'
 
 interface Document {
@@ -30,6 +30,7 @@ interface DocumentPageProps {
 }
 
 const DOC_TREE_EXPANDED_KEY = 'docs-tree-expanded'
+const MOBILE_MEDIA_QUERY = '(max-width: 767px)'
 
 function findAncestorIdsBySlug(documents: Document[], targetSlug: string): string[] {
   for (const doc of documents) {
@@ -51,12 +52,14 @@ function DocumentTree({
   currentSlug,
   expanded,
   onToggle,
+  onNavigate,
   level = 0,
 }: {
   documents: Document[]
   currentSlug: string
   expanded: Set<string>
   onToggle: (id: string) => void
+  onNavigate?: () => void
   level?: number
 }) {
   if (documents.length === 0) return null
@@ -92,6 +95,7 @@ function DocumentTree({
               <Link
                 href={`/docs/${doc.slug}`}
                 className="flex items-center gap-2 flex-1 min-w-0"
+                onClick={onNavigate}
               >
                 <FileText className="w-3.5 h-3.5 flex-shrink-0 opacity-50" />
                 <span className="truncate">{doc.title}</span>
@@ -103,6 +107,7 @@ function DocumentTree({
                 currentSlug={currentSlug}
                 expanded={expanded}
                 onToggle={onToggle}
+                onNavigate={onNavigate}
                 level={level + 1}
               />
             )}
@@ -113,7 +118,7 @@ function DocumentTree({
   )
 }
 
-function TOC({ content }: { content: string }) {
+function TOC({ content, onNavigate }: { content: string; onNavigate?: () => void }) {
   const headings = content.match(/^#{1,3}\s+.+$/gm) || []
   const items = headings.map(h => {
     const level = (h.match(/^#+/) || [''])[0].length
@@ -133,6 +138,7 @@ function TOC({ content }: { content: string }) {
         <a
           key={index}
           href={`#${item.id}`}
+          onClick={onNavigate}
           className="block text-sm text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors truncate"
           style={{ paddingLeft: `${(item.level - 1) * 12}px` }}
         >
@@ -143,10 +149,21 @@ function TOC({ content }: { content: string }) {
   )
 }
 
-export default function DocumentPageClient({ document, documentTree }: DocumentPageProps) {
-  const [leftSidebarOpen, setLeftSidebarOpen] = useState(true)
-  const [rightSidebarOpen, setRightSidebarOpen] = useState(true)
-  const ancestorIds = useMemo(() => findAncestorIdsBySlug(documentTree, document.slug), [documentTree, document.slug])
+export default function DocumentPageClient({ document: currentDocument, documentTree }: DocumentPageProps) {
+  const isMobileViewport = useSyncExternalStore(
+    (onStoreChange) => {
+      if (typeof window === 'undefined') return () => {}
+      const mediaQuery = window.matchMedia(MOBILE_MEDIA_QUERY)
+      mediaQuery.addEventListener('change', onStoreChange)
+      return () => mediaQuery.removeEventListener('change', onStoreChange)
+    },
+    () => window.matchMedia(MOBILE_MEDIA_QUERY).matches,
+    () => false
+  )
+  const [desktopLeftSidebarOpen, setDesktopLeftSidebarOpen] = useState(true)
+  const [desktopRightSidebarOpen, setDesktopRightSidebarOpen] = useState(true)
+  const [mobilePanel, setMobilePanel] = useState<'left' | 'right' | null>(null)
+  const ancestorIds = useMemo(() => findAncestorIdsBySlug(documentTree, currentDocument.slug), [documentTree, currentDocument.slug])
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set(ancestorIds))
 
   useEffect(() => {
@@ -171,6 +188,17 @@ export default function DocumentPageClient({ document, documentTree }: DocumentP
     sessionStorage.setItem(DOC_TREE_EXPANDED_KEY, JSON.stringify(Array.from(expanded)))
   }, [expanded])
 
+  useEffect(() => {
+    if (!isMobileViewport || !mobilePanel) return
+
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [isMobileViewport, mobilePanel])
+
   const toggleExpand = (id: string) => {
     setExpanded(prev => {
       const next = new Set(prev)
@@ -183,13 +211,37 @@ export default function DocumentPageClient({ document, documentTree }: DocumentP
     })
   }
 
+  const closeMobilePanels = () => {
+    setMobilePanel(null)
+  }
+
+  const toggleLeftSidebar = () => {
+    if (isMobileViewport) {
+      setMobilePanel((prev) => (prev === 'left' ? null : 'left'))
+      return
+    }
+    setDesktopLeftSidebarOpen(prev => !prev)
+  }
+
+  const toggleRightSidebar = () => {
+    if (isMobileViewport) {
+      setMobilePanel((prev) => (prev === 'right' ? null : 'right'))
+      return
+    }
+    setDesktopRightSidebarOpen(prev => !prev)
+  }
+
+  const leftSidebarOpen = isMobileViewport ? mobilePanel === 'left' : desktopLeftSidebarOpen
+  const rightSidebarOpen = isMobileViewport ? mobilePanel === 'right' : desktopRightSidebarOpen
+  const mobileOverlayOpen = isMobileViewport && mobilePanel !== null
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50/30 dark:from-slate-950 dark:via-slate-900 dark:to-indigo-950/30">
       <header className="sticky top-0 z-50 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-slate-200/80 dark:border-slate-800/80">
         <div className="h-14 flex items-center justify-between px-4">
           <div className="flex items-center gap-4">
             <button
-              onClick={() => setLeftSidebarOpen(!leftSidebarOpen)}
+              onClick={toggleLeftSidebar}
               className="p-2 text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
               title={leftSidebarOpen ? '隐藏目录' : '显示目录'}
             >
@@ -206,7 +258,7 @@ export default function DocumentPageClient({ document, documentTree }: DocumentP
 
           <div className="flex items-center gap-4">
             <button
-              onClick={() => setRightSidebarOpen(!rightSidebarOpen)}
+              onClick={toggleRightSidebar}
               className="p-2 text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
               title={rightSidebarOpen ? '隐藏大纲' : '显示大纲'}
             >
@@ -217,50 +269,50 @@ export default function DocumentPageClient({ document, documentTree }: DocumentP
       </header>
 
       <div className="flex">
-        <aside className={`flex-shrink-0 border-r border-slate-200/80 dark:border-slate-800/80 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm transition-all duration-300 ${
+        <aside className={`hidden md:block flex-shrink-0 border-r border-slate-200/80 dark:border-slate-800/80 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm transition-all duration-300 ${
           leftSidebarOpen ? 'w-64' : 'w-0 overflow-hidden'
         }`}>
           <div className="h-[calc(100vh-56px)] overflow-y-auto sticky top-14">
             <div className="p-4">
               <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-4">文档目录</h2>
-              <DocumentTree documents={documentTree} currentSlug={document.slug} expanded={expanded} onToggle={toggleExpand} />
+              <DocumentTree documents={documentTree} currentSlug={currentDocument.slug} expanded={expanded} onToggle={toggleExpand} />
             </div>
           </div>
         </aside>
 
-        <main className="flex-1 min-w-0 py-8 px-4 sm:px-8">
+        <main className="flex-1 min-w-0 py-6 sm:py-8 px-4 sm:px-8">
           <div className="max-w-4xl mx-auto">
             <article className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-xl shadow-slate-200/50 dark:shadow-slate-900/50 overflow-hidden">
-              <div className="px-8 sm:px-12 pt-12 pb-8">
-                {document.category && (
+              <div className="px-5 sm:px-12 pt-8 sm:pt-12 pb-8">
+                {currentDocument.category && (
                   <div className="mb-6">
                     <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-indigo-100 to-purple-100 dark:from-indigo-900/50 dark:to-purple-900/50 text-indigo-600 dark:text-indigo-300">
-                      {document.category.name}
+                      {currentDocument.category.name}
                     </span>
                   </div>
                 )}
 
                 <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 dark:text-slate-100 tracking-tight leading-tight mb-4">
-                  {document.title}
+                  {currentDocument.title}
                 </h1>
 
                 <div className="flex flex-wrap items-center gap-4 pt-6 border-t border-slate-100 dark:border-slate-800">
                   <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
                     <User className="w-4 h-4" />
-                    <span>{document.author.name || document.author.email}</span>
+                    <span>{currentDocument.author.name || currentDocument.author.email}</span>
                   </div>
                   <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
                     <Calendar className="w-4 h-4" />
-                    <span>{new Date(document.updatedAt).toLocaleDateString('zh-CN')}</span>
+                    <span>{new Date(currentDocument.updatedAt).toLocaleDateString('zh-CN')}</span>
                   </div>
                   <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
                     <Eye className="w-4 h-4" />
-                    <span>{document.viewCount + 1} 阅读</span>
+                    <span>{currentDocument.viewCount + 1} 阅读</span>
                   </div>
                 </div>
               </div>
 
-              <div className="px-8 sm:px-12 pb-12">
+              <div className="px-5 sm:px-12 pb-12">
                 <div className="prose dark:prose-invert prose-slate max-w-none [&_h1]:scroll-mt-20 [&_h2]:scroll-mt-20 [&_h3]:scroll-mt-20">
                   <ReactMarkdown
                     remarkPlugins={[remarkGfm]}
@@ -282,16 +334,16 @@ export default function DocumentPageClient({ document, documentTree }: DocumentP
                       },
                     }}
                   >
-                    {document.content}
+                    {currentDocument.content}
                   </ReactMarkdown>
                 </div>
               </div>
 
-              {document.children && document.children.length > 0 && (
-                <div className="px-8 sm:px-12 pb-12 border-t border-slate-100 dark:border-slate-800 pt-8">
+              {currentDocument.children && currentDocument.children.length > 0 && (
+                <div className="px-5 sm:px-12 pb-12 border-t border-slate-100 dark:border-slate-800 pt-8">
                   <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">子文档</h2>
                   <div className="grid gap-3">
-                    {document.children.map((child) => (
+                    {currentDocument.children.map((child) => (
                       <Link
                         key={child.id}
                         href={`/docs/${child.slug}`}
@@ -311,16 +363,56 @@ export default function DocumentPageClient({ document, documentTree }: DocumentP
           </div>
         </main>
 
-        <aside className={`flex-shrink-0 border-l border-slate-200/80 dark:border-slate-800/80 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm transition-all duration-300 ${
+        <aside className={`hidden md:block flex-shrink-0 border-l border-slate-200/80 dark:border-slate-800/80 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm transition-all duration-300 ${
           rightSidebarOpen ? 'w-56' : 'w-0 overflow-hidden'
         }`}>
           <div className="h-[calc(100vh-56px)] overflow-y-auto sticky top-14">
             <div className="p-4">
-              <TOC content={document.content} />
+              <TOC content={currentDocument.content} />
             </div>
           </div>
         </aside>
       </div>
+
+      {mobileOverlayOpen && (
+        <button
+          type="button"
+          className="md:hidden fixed inset-x-0 top-14 bottom-0 z-40 bg-slate-950/35 backdrop-blur-[1px]"
+          aria-label="关闭目录面板"
+          onClick={closeMobilePanels}
+        />
+      )}
+
+      <aside
+        className={`md:hidden fixed top-14 bottom-0 left-0 z-50 w-[min(20rem,88vw)] border-r border-slate-200/80 dark:border-slate-800/80 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl shadow-2xl shadow-slate-900/20 transition-transform duration-300 ${
+          leftSidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
+        <div className="h-full overflow-y-auto">
+          <div className="p-4">
+            <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-4">文档目录</h2>
+            <DocumentTree
+              documents={documentTree}
+              currentSlug={currentDocument.slug}
+              expanded={expanded}
+              onToggle={toggleExpand}
+              onNavigate={closeMobilePanels}
+            />
+          </div>
+        </div>
+      </aside>
+
+      <aside
+        className={`md:hidden fixed top-14 bottom-0 right-0 z-50 w-[min(18rem,82vw)] border-l border-slate-200/80 dark:border-slate-800/80 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl shadow-2xl shadow-slate-900/20 transition-transform duration-300 ${
+          rightSidebarOpen ? 'translate-x-0' : 'translate-x-full'
+        }`}
+      >
+        <div className="h-full overflow-y-auto">
+          <div className="p-4">
+            <TOC content={currentDocument.content} onNavigate={closeMobilePanels} />
+          </div>
+        </div>
+      </aside>
     </div>
   )
 }
