@@ -332,7 +332,8 @@ export default function AdminCategoriesPageClient() {
         </div>
 
         <div className="bg-white/80 dark:bg-slate-900/50 backdrop-blur-sm rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-xl overflow-hidden">
-          <table className="min-w-full">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[860px]">
             <thead className="bg-gradient-to-r from-slate-100 to-slate-50 dark:from-slate-800/50 dark:to-slate-800/30">
               <tr>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
@@ -400,7 +401,8 @@ export default function AdminCategoriesPageClient() {
                 </tr>
               ))}
             </tbody>
-          </table>
+            </table>
+          </div>
 
           {categories.length === 0 && (
             <div className="text-center py-16">

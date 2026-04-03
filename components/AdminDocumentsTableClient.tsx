@@ -122,7 +122,7 @@ export default function AdminDocumentsTableClient({ documents }: { documents: Ad
   }
 
   return (
-    <table className="min-w-full">
+    <table className="w-full min-w-[980px]">
       <thead className="bg-gradient-to-r from-slate-100 to-slate-50 dark:from-slate-800/50 dark:to-slate-800/30">
         <tr>
           <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">

@@ -201,22 +201,24 @@ export default async function AdminDocumentsPage({
         </div>
 
         <div className="bg-white/80 dark:bg-slate-900/50 backdrop-blur-sm rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-xl shadow-slate-200/50 dark:shadow-slate-900/50 overflow-hidden">
-          <AdminDocumentsTableClient
-            documents={paginationResult.docs.map((source) => {
-              const doc = localizeDocument(source, locale)
-              const category = doc.category ? localizeCategory(doc.category, locale) : null
-              return {
-                id: doc.id,
-                title: doc.title,
-                slug: doc.slug,
-                order: doc.order,
-                published: doc.published,
-                updatedAt: doc.updatedAt.toISOString(),
-                level: doc.level,
-                category: category ? { name: category.name } : null,
-              }
-            })}
-          />
+          <div className="overflow-x-auto">
+            <AdminDocumentsTableClient
+              documents={paginationResult.docs.map((source) => {
+                const doc = localizeDocument(source, locale)
+                const category = doc.category ? localizeCategory(doc.category, locale) : null
+                return {
+                  id: doc.id,
+                  title: doc.title,
+                  slug: doc.slug,
+                  order: doc.order,
+                  published: doc.published,
+                  updatedAt: doc.updatedAt.toISOString(),
+                  level: doc.level,
+                  category: category ? { name: category.name } : null,
+                }
+              })}
+            />
+          </div>
 
           {paginationResult.docs.length === 0 && (
             <div className="text-center py-16">
