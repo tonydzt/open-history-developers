@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { signOut, useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { LogOut, ChevronDown, LayoutDashboard, KeyRound, Sparkles } from 'lucide-react'
+import { LogOut, ChevronDown, LayoutDashboard, KeyRound, Sparkles, PlugZap } from 'lucide-react'
 import Link from 'next/link'
 import { createPortal } from 'react-dom'
 import { type Locale } from '@/lib/i18n'
@@ -91,12 +91,14 @@ export default function UserMenu({ locale = 'en' }: { locale?: Locale }) {
         accountCenter: '账户中心',
         adminConsole: '后台管理',
         myPrivateKey: '我的私钥',
+        mcpQuickSetup: 'MCP 一键配置',
         signOut: '退出登录',
       }
     : {
         accountCenter: 'Account Center',
         adminConsole: 'Admin Console',
         myPrivateKey: 'My Private Key',
+        mcpQuickSetup: 'MCP Quick Setup',
         signOut: 'Sign out',
       }
 
@@ -136,6 +138,15 @@ export default function UserMenu({ locale = 'en' }: { locale?: Locale }) {
         >
           <KeyRound className="w-4 h-4 text-slate-500 dark:text-slate-400" />
           {labels.myPrivateKey}
+        </Link>
+
+        <Link
+          href="/mcp-setup"
+          className="flex items-center gap-3 px-3 py-2.5 text-sm rounded-xl text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+          onClick={() => setIsOpen(false)}
+        >
+          <PlugZap className="w-4 h-4 text-slate-500 dark:text-slate-400" />
+          {labels.mcpQuickSetup}
         </Link>
       </div>
 

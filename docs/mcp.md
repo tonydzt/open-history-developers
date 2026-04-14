@@ -58,10 +58,29 @@ npm run mcp:start
 - `MCP_OPEN_API_PRIVATE_KEY`: OpenAPI 私钥（支持 `\\n`）
 - `MCP_OPEN_API_PRIVATE_KEY_FILE`: OpenAPI 私钥文件路径（与上面二选一）
 
+## HTTP 客户端鉴权（VS Code Codex 等）
+
+当 MCP 客户端是“直接连 `/api/mcp` 的 HTTP 模式”时，可以通过请求头传入每个用户的鉴权信息：
+
+- `x-open-api-user-id`: OpenAPI 用户 ID
+- `x-open-api-private-key`: OpenAPI 私钥（支持 `\\n`）
+- `x-mcp-session-cookie`: 会话 Cookie（可选，仅调用后台/用户接口时需要）
+
+说明：
+
+- 以上请求头会覆盖服务端进程环境变量中的 `MCP_OPEN_API_USER_ID`、`MCP_OPEN_API_PRIVATE_KEY`、`MCP_SESSION_COOKIE`。
+- 推荐做法是由客户端从本地环境变量映射这些请求头，避免在 UI 中明文粘贴私钥。
+
 ## 鉴权策略
 
 - OpenAPI 工具会自动计算 `x-user-id/x-timestamp/x-sign`。
 - 后台接口和用户接口通过 `MCP_SESSION_COOKIE` 转发 Cookie。
+
+是否必须传 `x-open-api-private-key`：
+
+- 调用 `/api/open/*` 对应的 MCP tools 时必须有“用户 ID + 私钥”（可来自请求头或服务端环境变量），否则会因缺少签名失败。
+- 调用需要登录态的后台/用户接口时，必须有有效会话 Cookie（可来自请求头或服务端环境变量）。
+- 仅调用无需这两类鉴权的公开接口时，可以不传以上字段。
 
 ## 工具命名
 

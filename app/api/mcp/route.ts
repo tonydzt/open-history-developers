@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getRuntimeConfig, handleMcpRequest, JsonRpcRequest, makeError, SERVER_NAME, SERVER_VERSION } from '@/mcp/core'
 
+function normalizePrivateKey(value: string): string {
+  return value.includes('\\n') ? value.replace(/\\n/g, '\n') : value
+}
+
 export async function GET(request: NextRequest) {
   const origin = request.nextUrl.origin
 
@@ -21,8 +25,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(makeError(null, -32700, 'Parse error'), { status: 400 })
   }
 
+  const headerUserId = request.headers.get('x-open-api-user-id') || undefined
+  const headerPrivateKeyRaw = request.headers.get('x-open-api-private-key')
+  const headerPrivateKey = headerPrivateKeyRaw ? normalizePrivateKey(headerPrivateKeyRaw) : undefined
+  const headerSessionCookie = request.headers.get('x-mcp-session-cookie') || undefined
+
   const config = getRuntimeConfig({
     baseUrl: process.env.MCP_API_BASE_URL || request.nextUrl.origin,
+    openApiUserId: headerUserId,
+    openApiPrivateKey: headerPrivateKey,
+    sessionCookie: headerSessionCookie,
   })
 
   try {
